@@ -52,23 +52,5 @@ Page({
     } catch (error) {
       wx.showToast({ title: "设置失败", icon: "none" });
     }
-  },
-
-  async seedFirstPost() {
-    try {
-      wx.showLoading({ title: "初始化中" });
-      const { result } = await wx.cloud.callFunction({
-        name: "admin",
-        data: { action: "seedFirstPost" }
-      });
-      if (!result?.ok) {
-        throw new Error(result?.message || "初始化失败");
-      }
-      wx.showToast({ title: "初始化成功" });
-    } catch (error) {
-      wx.showToast({ title: error.message || "初始化失败", icon: "none" });
-    } finally {
-      wx.hideLoading();
-    }
   }
 });

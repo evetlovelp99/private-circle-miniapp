@@ -24,23 +24,19 @@ exports.main = async (event) => {
 
   if (action === "getSession") {
     const users = await db.collection("users").where({ openid: OPENID }).limit(1).get();
-    const totalUsers = await db.collection("users").count();
-    const firstUserRes = await db.collection("users").orderBy("createdAt", "asc").limit(1).get();
-    const isAdmin =
-      firstUserRes.data.length > 0 && firstUserRes.data[0].openid === OPENID;
+    const isAdmin = !!process.env.OWNER_OPENID && OPENID === process.env.OWNER_OPENID;
     return {
       ok: true,
       openid: OPENID,
       user: users.data[0] || null,
-      canBootstrap: totalUsers.total === 0,
+      canBootstrap: isAdmin && !users.data.length,
       isAdmin
     };
   }
 
   if (action === "bootstrapOwner") {
-    const totalUsers = await db.collection("users").count();
-    if (totalUsers.total > 0) {
-      return { ok: false, message: "圈子已创建，请使用邀请码进入" };
+    if (!process.env.OWNER_OPENID || OPENID !== process.env.OWNER_OPENID) {
+      return { ok: false, message: "仅指定创建者可创建圈子" };
     }
     const user = await ensureUser(OPENID);
     return { ok: true, openid: OPENID, user };

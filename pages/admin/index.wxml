@@ -15,8 +15,4 @@
     <button bindtap="silentCutoff">停止他看到你后续新动态</button>
   </view>
 
-  <view class="card">
-    <view class="title">调试工具</view>
-    <button bindtap="seedFirstPost">初始化首条测试数据</button>
-  </view>
 </view>

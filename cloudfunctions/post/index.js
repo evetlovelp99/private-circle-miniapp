@@ -104,9 +104,7 @@ exports.main = async (event) => {
       return { ok: false, message: "not found" };
     }
     const isAuthor = post.authorId === OPENID;
-    const firstUserRes = await db.collection("users").orderBy("createdAt", "asc").limit(1).get();
-    const isAdmin =
-      firstUserRes.data.length > 0 && firstUserRes.data[0].openid === OPENID;
+    const isAdmin = !!process.env.OWNER_OPENID && OPENID === process.env.OWNER_OPENID;
     if (!isAuthor && !isAdmin) {
       return { ok: false, message: "no permission" };
     }
