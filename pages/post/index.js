@@ -62,24 +62,7 @@ Page({
 
       const post = result.post;
       const images = post.images || [];
-      const ids = [];
-      if (post.audio) ids.push(post.audio);
-      if (post.video) ids.push(post.video);
-      if (post.liveMotion) ids.push(post.liveMotion);
-      if (post.videoThumb) ids.push(post.videoThumb);
-      if (post.liveMotion && images[0]) ids.push(images[0]);
-
-      let urlMap = {};
-      if (ids.length) {
-        try {
-          const tempRes = await wx.cloud.getTempFileURL({ fileList: ids });
-          (tempRes.fileList || []).forEach((item) => {
-            urlMap[item.fileID] = item.tempFileURL;
-          });
-        } catch (e) {
-          console.error(e);
-        }
-      }
+      const urlMap = result.mediaUrls || {};
 
       const hasLive = !!(post.liveMotion && images.length);
       const audioUrl = post.audio ? urlMap[post.audio] || "" : "";
@@ -100,7 +83,7 @@ Page({
       this.setData({
         post: {
           ...post,
-          images
+          images: images.map((id) => urlMap[id] || "").filter(Boolean)
         },
         comments: result.comments || [],
         audioUrl,

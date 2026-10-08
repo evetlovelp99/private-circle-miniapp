@@ -1,31 +1,6 @@
 const { ensureAuthed, toPostPage } = require("../../utils/auth");
 const { formatTime } = require("../../utils/time");
 
-async function attachMediaTempUrls(posts) {
-  const ids = new Set();
-  (posts || []).forEach((p) => {
-    if (!p) return;
-    if (p.audio) ids.add(p.audio);
-    if (p.video) ids.add(p.video);
-    if (p.liveMotion) ids.add(p.liveMotion);
-    if (p.videoThumb) ids.add(p.videoThumb);
-    if (p.liveMotion && p.images && p.images[0]) ids.add(p.images[0]);
-  });
-  const list = [...ids];
-  if (!list.length) return {};
-  try {
-    const res = await wx.cloud.getTempFileURL({ fileList: list });
-    const map = {};
-    (res.fileList || []).forEach((item) => {
-      map[item.fileID] = item.tempFileURL;
-    });
-    return map;
-  } catch (error) {
-    console.error(error);
-    return {};
-  }
-}
-
 Page({
   data: {
     posts: [],
@@ -69,7 +44,7 @@ Page({
         data: { action: "listPosts" }
       });
       const raw = result?.data || [];
-      const urlMap = await attachMediaTempUrls(raw);
+      const urlMap = result?.mediaUrls || {};
       const openid = session?.openid ?? this.data.openid;
       const isAdmin = !!(session?.isAdmin ?? this.data.isAdmin);
       const posts = raw.map((item) => {
@@ -86,7 +61,7 @@ Page({
         const livePosterUrl = hasLive && images[0] ? urlMap[images[0]] || "" : "";
         return {
           ...item,
-          images,
+          images: images.map((id) => urlMap[id] || "").filter(Boolean),
           audioUrl,
           videoUrl,
           videoPosterUrl,

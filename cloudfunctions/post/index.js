@@ -38,6 +38,26 @@ async function canViewPost(post, viewerOpenid) {
   return post.createdAt <= relation.canViewUntil;
 }
 
+function collectFileIDs(post) {
+  return [...new Set([...(post.images || []), post.audio, post.video, post.videoThumb, post.liveMotion].filter(isFileID))];
+}
+
+async function resolveMedia(posts) {
+  const ids = [...new Set(posts.flatMap(collectFileIDs))];
+  const mediaUrls = {};
+  for (let i = 0; i < ids.length; i += 50) {
+    try {
+      const result = await cloud.getTempFileURL({ fileList: ids.slice(i, i + 50) });
+      for (const item of result.fileList || []) {
+        if (item.status === 0 && item.tempFileURL) mediaUrls[item.fileID] = item.tempFileURL;
+      }
+    } catch (error) {
+      console.error("resolve media failed", error);
+    }
+  }
+  return mediaUrls;
+}
+
 function isOwner(openid) {
   return !!process.env.OWNER_OPENID && openid === process.env.OWNER_OPENID;
 }
@@ -126,7 +146,7 @@ async function handle(event) {
         liked: postLikes.some((l) => l.userId === OPENID)
       };
     });
-    return { ok: true, data };
+    return { ok: true, data, mediaUrls: await resolveMedia(posts) };
   }
 
   if (action === "deletePost") {
@@ -199,7 +219,8 @@ async function handle(event) {
         ...post,
         author: userRes.data[0] || {}
       },
-      comments
+      comments,
+      mediaUrls: await resolveMedia([post])
     };
   }
 
