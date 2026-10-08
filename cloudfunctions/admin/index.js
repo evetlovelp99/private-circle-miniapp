@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const cloud = require("wx-server-sdk");
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
@@ -5,7 +6,9 @@ const db = cloud.database();
 const _ = db.command;
 
 function randomCode() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase();
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  // 32 symbols divides 256 exactly: no modulo bias.
+  return [...crypto.randomBytes(12)].map((byte) => alphabet[byte % alphabet.length]).join("");
 }
 
 async function ensureAdmin(openid) {
@@ -22,17 +25,23 @@ async function handle(event) {
   }
 
   if (action === "createInviteCode") {
-    const code = randomCode();
-    await db.collection("inviteCodes").add({
-      data: {
-        code,
-        createdBy: OPENID,
-        usedBy: "",
-        isUsed: false,
-        createdAt: new Date().toISOString()
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const code = randomCode();
+      const existing = await db.collection("inviteCodes").where({ code }).limit(1).get();
+      if (existing.data.length) continue;
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      try {
+        await db.collection("inviteCodes").add({ data: {
+          _id: code, code, createdBy: OPENID, usedBy: "", used: false,
+          createdAt: new Date().toISOString(), expiresAt
+        } });
+        return { ok: true, code, expiresAt };
+      } catch (error) {
+        const collision = await db.collection("inviteCodes").where({ code }).limit(1).get();
+        if (!collision.data.length) throw error;
       }
-    });
-    return { ok: true, code };
+    }
+    return { ok: false, msg: "邀请码生成失败，请重试" };
   }
 
   if (action === "listMembers") {

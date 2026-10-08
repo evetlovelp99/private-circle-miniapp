@@ -6,16 +6,24 @@ const _ = db.command;
 
 async function ensureUser(openid) {
   const users = db.collection("users");
-  const found = await users.where({ openid }).limit(1).get();
+  const found = await users.where({ _id: openid }).limit(1).get();
   if (found.data.length) return found.data[0];
+  const legacy = await users.where({ openid }).limit(1).get();
   const user = {
     openid,
     nickname: `用户${openid.slice(-4)}`,
     avatar: "",
     createdAt: new Date().toISOString()
   };
-  const added = await users.add({ data: user });
-  return { ...user, _id: added._id };
+  const canonical = { ...(legacy.data[0] || user), _id: openid, openid };
+  try {
+    await users.add({ data: canonical });
+    return canonical;
+  } catch (error) {
+    const raced = await users.where({ _id: openid }).limit(1).get();
+    if (raced.data.length) return raced.data[0];
+    throw error;
+  }
 }
 
 async function handle(event) {
@@ -50,35 +58,45 @@ async function handle(event) {
     }
     const inviteRes = await db.collection("inviteCodes").where({
       code,
-      isUsed: false
+      used: false
     }).limit(1).get();
     if (!inviteRes.data.length) {
       return { ok: false, msg: "邀请码无效或已使用" };
     }
 
     const invite = inviteRes.data[0];
+    const now = new Date().toISOString();
+    if (!process.env.OWNER_OPENID || invite.createdBy !== process.env.OWNER_OPENID ||
+        typeof invite.expiresAt !== "string" || !Number.isFinite(Date.parse(invite.expiresAt)) || invite.expiresAt <= now) {
+      return { ok: false, msg: "邀请码已过期或无效" };
+    }
+    const consumed = await db.collection("inviteCodes").where({
+      code, used: false, expiresAt: _.gt(now), createdBy: process.env.OWNER_OPENID
+    }).update({ data: { used: true, usedBy: OPENID, usedAt: now } });
+    if (consumed.stats.updated !== 1) return { ok: false, msg: "邀请码已使用或过期" };
     const user = await ensureUser(OPENID);
-    await db.collection("inviteCodes").doc(invite._id).update({
-      data: {
-        isUsed: true,
-        usedBy: OPENID,
-        usedAt: new Date().toISOString()
-      }
-    });
 
     const relRes = await db.collection("relations").where({
       ownerUserId: invite.createdBy,
       viewerUserId: OPENID
     }).limit(1).get();
     if (!relRes.data.length) {
-      await db.collection("relations").add({
+      try {
+        await db.collection("relations").add({
         data: {
+          _id: `${invite.createdBy}_${OPENID}`,
           ownerUserId: invite.createdBy,
           viewerUserId: OPENID,
           canViewUntil: null,
           createdAt: new Date().toISOString()
         }
-      });
+        });
+      } catch (error) {
+        const raced = await db.collection("relations").where({
+          ownerUserId: invite.createdBy, viewerUserId: OPENID
+        }).limit(1).get();
+        if (!raced.data.length) throw error;
+      }
     }
     return { ok: true, openid: OPENID, user };
   }
