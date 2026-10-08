@@ -350,7 +350,7 @@ Page({
       wx.switchTab({ url: "/pages/feed/index" });
     } catch (error) {
       console.error(error);
-      wx.showToast({ title: "发布失败，请稍后重试", icon: "none" });
+      wx.showToast({ title: error.message || "发布失败，请稍后重试", icon: "none" });
     } finally {
       this.setData({ submitting: false });
       wx.hideLoading();

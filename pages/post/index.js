@@ -42,7 +42,7 @@ Page({
       const result = detailRes.result;
       if (!result?.ok || !result.post) {
         wx.showToast({
-          title: result?.msg === "no permission" ? "暂无权限查看" : "加载失败",
+          title: result?.msg || "加载失败",
           icon: "none"
         });
         this.setData({
@@ -117,7 +117,7 @@ Page({
           wx.showToast({ title: "已删除" });
           setTimeout(() => wx.navigateBack(), 300);
         } catch (e) {
-          wx.showToast({ title: "删除失败", icon: "none" });
+          wx.showToast({ title: e.message || "删除失败", icon: "none" });
         }
       }
     });
@@ -130,7 +130,7 @@ Page({
   async submitComment() {
     if (!this.data.content.trim()) return;
     try {
-      await wx.cloud.callFunction({
+      const { result } = await wx.cloud.callFunction({
         name: "post",
         data: {
           action: "addComment",
@@ -138,10 +138,11 @@ Page({
           content: this.data.content.trim()
         }
       });
+      if (!result?.ok) throw new Error(result?.msg || "评论失败");
       this.setData({ content: "" });
       this.loadDetail();
     } catch (error) {
-      wx.showToast({ title: "评论失败", icon: "none" });
+      wx.showToast({ title: error.message || "评论失败", icon: "none" });
     }
   }
 });

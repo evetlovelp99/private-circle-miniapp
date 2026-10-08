@@ -23,7 +23,7 @@ Page({
         data: { action: "listMembers" }
       });
       if (!result?.ok) {
-        wx.showToast({ title: result?.msg === "only admin allowed" ? "仅创建者可管理成员" : "加载失败", icon: "none" });
+        wx.showToast({ title: result?.msg || "加载失败", icon: "none" });
         this.setData({ loading: false });
         setTimeout(() => wx.navigateBack(), 1500);
         return;

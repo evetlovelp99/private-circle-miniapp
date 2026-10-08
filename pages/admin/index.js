@@ -28,9 +28,10 @@ Page({
         name: "admin",
         data: { action: "createInviteCode" }
       });
+      if (!result?.ok) throw new Error(result?.msg || "创建失败");
       this.setData({ newCode: result?.code || "" });
     } catch (error) {
-      wx.showToast({ title: "创建失败", icon: "none" });
+      wx.showToast({ title: error.message || "创建失败", icon: "none" });
     }
   },
 
@@ -40,17 +41,18 @@ Page({
       return;
     }
     try {
-      await wx.cloud.callFunction({
+      const { result } = await wx.cloud.callFunction({
         name: "admin",
         data: {
           action: "silentCutoff",
           viewerOpenid: this.data.viewerOpenid
         }
       });
+      if (!result?.ok) throw new Error(result?.msg || "设置失败");
       wx.showToast({ title: "已设置" });
       this.setData({ viewerOpenid: "" });
     } catch (error) {
-      wx.showToast({ title: "设置失败", icon: "none" });
+      wx.showToast({ title: error.message || "设置失败", icon: "none" });
     }
   }
 });

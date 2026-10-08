@@ -122,7 +122,7 @@ Page({
           this.loadPosts();
         } catch (err) {
           wx.showToast({
-            title: err.message === "no permission" ? "无权限删除" : "删除失败",
+            title: err.message || "删除失败",
             icon: "none"
           });
         }
@@ -133,13 +133,14 @@ Page({
   async onLikeTap(e) {
     const postId = e.currentTarget.dataset.id;
     try {
-      await wx.cloud.callFunction({
+      const { result } = await wx.cloud.callFunction({
         name: "post",
         data: { action: "toggleLike", postId }
       });
+      if (!result?.ok) throw new Error(result?.msg || "操作失败");
       this.loadPosts();
     } catch (error) {
-      wx.showToast({ title: "操作失败", icon: "none" });
+      wx.showToast({ title: error.message || "操作失败", icon: "none" });
     }
   },
 
