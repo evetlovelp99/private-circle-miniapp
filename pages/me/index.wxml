@@ -1,0 +1,9 @@
+<view class="container">
+  <view class="card" wx:if="{{user}}">
+    <view>昵称：{{user.nickname || "未设置"}}</view>
+    <view>OpenID：{{openid}}</view>
+  </view>
+  <view class="card">
+    <button bindtap="goAdmin">进入管理页</button>
+  </view>
+</view>

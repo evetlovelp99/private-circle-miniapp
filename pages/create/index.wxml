@@ -1,0 +1,68 @@
+<view class="container">
+  <view class="card">
+    <textarea
+      class="textarea"
+      placeholder="写点什么..."
+      maxlength="1000"
+      value="{{text}}"
+      bindinput="onTextInput"
+    />
+
+    <view class="section-tip">图片（可多张，与下方视频/实况互斥）</view>
+    <view class="image-list" wx:if="{{images.length}}">
+      <image class="img" wx:for="{{images}}" wx:key="*this" src="{{item}}" mode="aspectFill" />
+    </view>
+    <button bindtap="chooseImages">选图片（最多9张）</button>
+
+    <view class="section-tip">视频（一条最长约 5 分钟）</view>
+    <view wx:if="{{videoTempPath}}" class="video-preview">
+      <video
+        class="preview-video"
+        src="{{videoTempPath}}"
+        poster="{{videoThumbTempPath}}"
+        controls
+        show-center-play-btn="{{true}}"
+      />
+      <view class="meta" wx:if="{{videoDurationSec}}">约 {{videoDurationSec}} 秒</view>
+      <button size="mini" bindtap="discardVideo">移除视频</button>
+    </view>
+    <button wx:else bindtap="chooseVideo">选视频</button>
+
+    <view class="section-tip">实况（先封面原图，再选动态短视频 ≤60 秒）</view>
+    <view wx:if="{{liveCoverTempPath}}" class="live-row">
+      <image class="live-cover" src="{{liveCoverTempPath}}" mode="aspectFill" />
+      <text class="live-label">封面</text>
+    </view>
+    <view wx:if="{{liveMotionTempPath}}" class="video-preview">
+      <video
+        class="preview-video"
+        src="{{liveMotionTempPath}}"
+        controls
+        show-center-play-btn="{{true}}"
+      />
+      <text class="live-label">动态片段</text>
+    </view>
+    <view class="btn-row">
+      <button size="mini" bindtap="chooseLiveCover">1 实况封面</button>
+      <button size="mini" bindtap="chooseLiveMotion">2 实况动态</button>
+      <button wx:if="{{liveCoverTempPath || liveMotionTempPath}}" size="mini" bindtap="discardLive">清除实况</button>
+    </view>
+
+    <view class="voice-block">
+      <view
+        class="record-chip {{recording ? 'recording' : ''}}"
+        catchtouchstart="startRecord"
+        catchtouchend="stopRecord"
+        catchtouchcancel="stopRecord"
+      >
+        {{recording ? '松开结束' : '按住说话（最长60秒）'}}
+      </view>
+      <block wx:if="{{audioTempPath && !recording}}">
+        <view class="voice-hint">已录一段语音，发布时会一起带上</view>
+        <button size="mini" bindtap="discardAudio">清除语音</button>
+      </block>
+    </view>
+
+    <button class="btn-primary" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submitPost">发布</button>
+  </view>
+</view>

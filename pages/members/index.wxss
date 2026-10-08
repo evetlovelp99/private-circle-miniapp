@@ -1,0 +1,52 @@
+.hint {
+  color: #888;
+  margin: 24rpx;
+  font-size: 26rpx;
+}
+
+.member .row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 12rpx;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.openid {
+  font-size: 24rpx;
+  color: #666;
+  word-break: break-all;
+  margin-bottom: 16rpx;
+}
+
+.actions {
+  display: flex;
+  gap: 12rpx;
+}
+
+.tag {
+  font-size: 22rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.tag.ok {
+  background: #e8f8e8;
+  color: #1aad19;
+}
+
+.tag.muted {
+  background: #f0f0f0;
+  color: #999;
+}
+
+.muted {
+  color: #888;
+}
+
+.small {
+  font-size: 24rpx;
+}

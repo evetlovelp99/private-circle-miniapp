@@ -1,0 +1,22 @@
+<view class="container">
+  <view class="card">
+    <button bindtap="goMembers">成员管理（邀请进来的人）</button>
+  </view>
+
+  <view class="card">
+    <view class="title">生成邀请码</view>
+    <button class="btn-primary" bindtap="createInviteCode">生成一次性邀请码</button>
+    <view class="code" wx:if="{{newCode}}">最新邀请码：{{newCode}}</view>
+  </view>
+
+  <view class="card">
+    <view class="title">静默减少可见性</view>
+    <input class="input" placeholder="输入对方 openid" value="{{viewerOpenid}}" bindinput="onInputViewer" />
+    <button bindtap="silentCutoff">停止他看到你后续新动态</button>
+  </view>
+
+  <view class="card">
+    <view class="title">调试工具</view>
+    <button bindtap="seedFirstPost">初始化首条测试数据</button>
+  </view>
+</view>

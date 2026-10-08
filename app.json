@@ -1,0 +1,38 @@
+{
+  "pages": [
+    "pages/invite/index",
+    "pages/feed/index",
+    "pages/create/index",
+    "pages/post/index",
+    "pages/me/index",
+    "pages/admin/index",
+    "pages/members/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "小圈子",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f7f7f7"
+  },
+  "tabBar": {
+    "color": "#666666",
+    "selectedColor": "#1aad19",
+    "list": [
+      {
+        "pagePath": "pages/feed/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/create/index",
+        "text": "发布"
+      },
+      {
+        "pagePath": "pages/me/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "cloud": true,
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

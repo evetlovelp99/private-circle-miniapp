@@ -1,0 +1,19 @@
+<view class="container">
+  <view class="hint" wx:if="{{!loading && members.length === 0}}">
+    暂无通过你邀请的成员。生成邀请码后，对方绑定成功会出现在这里。
+  </view>
+  <block wx:for="{{members}}" wx:key="viewerOpenid">
+    <view class="card member">
+      <view class="row">
+        <text class="name">{{item.nickname}}</text>
+        <text wx:if="{{item.cutoff}}" class="tag muted">已切断</text>
+        <text wx:else class="tag ok">可看新动态</text>
+      </view>
+      <view class="openid">{{item.viewerOpenid}}</view>
+      <view wx:if="{{!item.cutoff}}" class="actions">
+        <button size="mini" data-openid="{{item.viewerOpenid}}" bindtap="silentCutoff">停止对方看新动态</button>
+      </view>
+      <view wx:else class="muted small">{{item.statusLabel}}</view>
+    </view>
+  </block>
+</view>

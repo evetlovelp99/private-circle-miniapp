@@ -1,0 +1,17 @@
+<view class="container">
+  <view class="card">
+    <view class="title">输入邀请码进入私密圈</view>
+    <input
+      class="input"
+      placeholder="请输入邀请码"
+      value="{{code}}"
+      bindinput="onInputCode"
+    />
+    <button class="btn-primary" loading="{{submitting}}" bindtap="submitCode">
+      验证并进入
+    </button>
+    <button wx:if="{{canBootstrap}}" bindtap="bootstrapOwner">
+      我是创建者，创建圈子
+    </button>
+  </view>
+</view>

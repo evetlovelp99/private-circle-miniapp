@@ -1,0 +1,60 @@
+<view class="container">
+  <block wx:if="{{posts.length}}">
+    <view class="card post" wx:for="{{posts}}" wx:key="_id">
+      <view class="head">
+        <text class="name">{{item.author.nickname || "匿名用户"}}</text>
+        <text class="time">{{item.formattedTime}}</text>
+      </view>
+      <view wx:if="{{item.text}}" class="text">{{item.text}}</view>
+      <view class="audio-wrap" wx:if="{{item.audioUrl}}">
+        <audio class="audio" controls="{{true}}" src="{{item.audioUrl}}" />
+      </view>
+
+      <view wx:if="{{item.hasLive && item.liveMotionUrl}}" class="video-wrap">
+        <video
+          class="feed-video"
+          src="{{item.liveMotionUrl}}"
+          poster="{{item.livePosterUrl}}"
+          controls
+          show-center-play-btn="{{true}}"
+          object-fit="contain"
+        />
+        <view class="badge-live">实况</view>
+      </view>
+
+      <view wx:elif="{{item.showVideoOnly && item.videoUrl}}" class="video-wrap">
+        <video
+          class="feed-video"
+          src="{{item.videoUrl}}"
+          poster="{{item.videoPosterUrl}}"
+          controls
+          show-center-play-btn="{{true}}"
+          object-fit="contain"
+        />
+      </view>
+
+      <view class="image-list" wx:if="{{item.images.length && !item.hasLive}}">
+        <image
+          class="img"
+          wx:for="{{item.images}}"
+          wx:key="*this"
+          mode="aspectFill"
+          src="{{item}}"
+        />
+      </view>
+
+      <view class="bar">
+        <button size="mini" data-id="{{item._id}}" bindtap="onLikeTap">
+          {{item.liked ? "已赞" : "点赞"}} {{item.likeCount}}
+        </button>
+        <button size="mini" data-id="{{item._id}}" bindtap="goPost">
+          评论 {{item.commentCount}}
+        </button>
+        <button wx:if="{{item._canDelete}}" size="mini" data-id="{{item._id}}" bindtap="onDeletePost">
+          删除
+        </button>
+      </view>
+    </view>
+  </block>
+  <view class="empty" wx:else>暂无新动态</view>
+</view>
