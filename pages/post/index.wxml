@@ -1,6 +1,8 @@
 <view class="container" wx:if="{{post}}">
+  <view class="page-heading"><view class="page-title">这一刻的小日常</view><view class="page-note">聊聊这条动态吧。</view></view>
   <view class="card">
     <view class="detail-head">
+      <blob-avatar identity="{{post.authorId || post.author.nickname}}" size="80" />
       <view class="name">{{post.author.nickname || "匿名用户"}}</view>
       <button wx:if="{{canDelete}}" class="danger" size="mini" bindtap="onDelete">删除</button>
     </view>

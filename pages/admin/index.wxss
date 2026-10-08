@@ -1,17 +1,4 @@
-.title {
-  font-weight: 600;
-  margin-bottom: 12rpx;
-}
-
-.code {
-  margin-top: 12rpx;
-  color: #1aad19;
-  word-break: break-all;
-}
-
-.input {
-  border: 1px solid #ddd;
-  border-radius: 10rpx;
-  padding: 16rpx;
-  margin-bottom: 16rpx;
-}
+.title { margin-bottom: 24rpx; }
+.code { margin-top: 24rpx; color: var(--blue-deep); word-break: break-all; font-weight: 600; padding: 20rpx; background: var(--blue-light); border: var(--line); border-radius: 24rpx; }
+.code button { margin-top: 16rpx; }
+.input { margin-bottom: 24rpx; }

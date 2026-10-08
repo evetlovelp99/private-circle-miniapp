@@ -1,0 +1,3 @@
+<view class="blob-avatar blob-{{colorName}}" style="width: {{size}}rpx; height: {{size}}rpx;" aria-hidden="true">
+  <view class="blob-eyes"><view class="blob-eye" /><view class="blob-eye" /></view>
+</view>

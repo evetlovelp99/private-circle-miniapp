@@ -1,9 +1,22 @@
-<view class="container">
+<wxs module="time" src="./time.wxs" />
+<view class="container feed-page">
+  <view class="feed-intro">
+    <view class="intro-copy">
+      <view class="intro-eyebrow">Hi {{currentUser.nickname || '圈友'}}</view>
+      <view class="intro-title">私密圈的小日常</view>
+      <view class="intro-subtitle">小小圈子，装下大大小小的快乐。</view>
+    </view>
+    <blob-avatar identity="{{openid || currentUser.nickname}}" size="112" />
+  </view>
   <block wx:if="{{posts.length}}">
     <view class="card post" wx:for="{{posts}}" wx:key="_id">
       <view class="head">
-        <text class="name">{{item.author.nickname || "匿名用户"}}</text>
-        <text class="time">{{item.formattedTime}}</text>
+        <blob-avatar identity="{{item.authorId || item.author.nickname}}" size="80" />
+        <view class="author-info">
+          <view class="name">{{item.author.nickname || "匿名用户"}}</view>
+          <view class="time">{{time.relative(item.createdAt, item.formattedTime)}}</view>
+        </view>
+        <button class="more-button" wx:if="{{item._canDelete}}" data-id="{{item._id}}" bindtap="onPostMenu" aria-label="动态操作">···</button>
       </view>
       <view wx:if="{{item.text}}" class="text">{{item.text}}</view>
       <view class="audio-wrap" wx:if="{{item.audioUrl}}">
@@ -48,17 +61,31 @@
       </view>
 
       <view class="bar">
-        <button size="mini" data-id="{{item._id}}" bindtap="onLikeTap">
-          {{item.liked ? "已赞" : "点赞"}} {{item.likeCount}}
+        <button hover-class="action-pressed" class="action-button {{item.liked ? 'is-liked' : ''}}" size="mini" data-id="{{item._id}}" bindtap="onLikeTap" aria-label="{{item.liked ? '取消点赞' : '点赞'}}，{{item.likeCount}}个赞">
+          <text class="heart-icon" aria-hidden="true">{{item.liked ? '♥' : '♡'}}</text>
+          <text class="action-count">{{item.likeCount}}</text>
         </button>
-        <button size="mini" data-id="{{item._id}}" bindtap="goPost">
-          评论 {{item.commentCount}}
+        <button hover-class="action-pressed" class="action-button" size="mini" data-id="{{item._id}}" bindtap="goPost" aria-label="评论，{{item.commentCount}}条">
+          <view class="comment-icon" aria-hidden="true" />
+          <text class="action-count">{{item.commentCount}}</text>
         </button>
-        <button wx:if="{{item._canDelete}}" size="mini" data-id="{{item._id}}" bindtap="onDeletePost">
-          删除
-        </button>
+
+      </view>
+      <view class="comment-preview" wx:if="{{item.previewComments.length}}">
+        <view class="preview-line">
+          <text class="preview-nickname">{{item.previewComments[0].nickname}}：</text><text class="preview-content">{{item.previewComments[0].content}}</text>
+        </view>
+        <view class="preview-line" wx:if="{{item.previewComments.length > 1}}">
+          <text class="preview-nickname">{{item.previewComments[1].nickname}}：</text><text class="preview-content">{{item.previewComments[1].content}}</text>
+        </view>
+        <view class="preview-all" wx:if="{{item.commentCount > 2}}" data-id="{{item._id}}" bindtap="goPost" role="button" aria-label="查看全部 {{item.commentCount}} 条评论">查看全部 {{item.commentCount}} 条评论</view>
       </view>
     </view>
   </block>
-  <view class="empty" wx:else>暂无新动态</view>
+  <view class="card empty" wx:else>
+    <view class="empty-mark">☀</view>
+    <view class="empty-title">{{loading ? '正在看看圈子里的日常' : '日常，慢慢积攒'}}</view>
+    <view class="empty-description">{{loading ? '稍等片刻，动态马上就来。' : '暂无新动态，去「发布」留下一点今天吧。'}}</view>
+  </view>
+  <view class="feed-end" wx:if="{{posts.length && !hasMore}}">已经看到这里的全部日常</view>
 </view>

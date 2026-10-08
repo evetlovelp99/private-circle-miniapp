@@ -1,18 +1,23 @@
-<view class="container">
+<view class="container publish-page">
+  <view class="publish-hero">
+    <blob-avatar identity="{{currentUser.openid || currentUser.nickname}}" size="144" />
+    <view class="hero-title">今天想说点什么</view>
+    <view class="hero-note">给日常画上一个小小的记号</view>
+  </view>
   <view class="card">
     <textarea
-      class="textarea"
-      placeholder="写点什么..."
+      class="textarea" placeholder-class="text-placeholder"
+      placeholder="写点什么吧…"
       maxlength="1000"
       value="{{text}}"
       bindinput="onTextInput"
     />
 
     <view class="section-tip">图片（可多张，与下方视频/实况互斥）</view>
-    <view class="image-list" wx:if="{{images.length}}">
+    <view class="image-list">
       <image class="img" wx:for="{{images}}" wx:key="*this" src="{{item}}" mode="aspectFill" />
+      <button class="add-image" wx:if="{{images.length < 9}}" bindtap="chooseImages" aria-label="添加图片，最多9张">+</button>
     </view>
-    <button bindtap="chooseImages">选图片（最多9张）</button>
 
     <view class="section-tip">视频（一条最长约 5 分钟）</view>
     <view wx:if="{{videoTempPath}}" class="video-preview">
@@ -63,6 +68,6 @@
       </block>
     </view>
 
-    <button class="btn-primary" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submitPost">发布</button>
+    <button class="btn-primary publish-submit" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submitPost">发布</button>
   </view>
 </view>

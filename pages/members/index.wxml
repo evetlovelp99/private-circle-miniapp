@@ -1,10 +1,12 @@
 <view class="container">
+  <view class="page-heading"><view class="page-title">圈子里的朋友</view><view class="page-note">在这里查看成员的可见状态。</view></view>
   <view class="hint" wx:if="{{!loading && members.length === 0}}">
     暂无通过你邀请的成员。生成邀请码后，对方绑定成功会出现在这里。
   </view>
   <block wx:for="{{members}}" wx:key="viewerOpenid">
     <view class="card member">
       <view class="row">
+        <blob-avatar identity="{{item.viewerOpenid || item.nickname}}" size="72" />
         <text class="name">{{item.nickname}}</text>
         <text wx:if="{{item.cutoff}}" class="tag muted">已切断</text>
         <text wx:else class="tag ok">可看新动态</text>

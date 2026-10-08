@@ -1,0 +1,11 @@
+// Display-only relative time; no post fields are added or changed.
+function relative(iso, fallback) {
+  var date = getDate(iso);
+  var elapsed = getDate().getTime() - date.getTime();
+  if (!(elapsed >= 0)) return fallback;
+  if (elapsed < 60000) return '刚刚';
+  if (elapsed < 3600000) return Math.floor(elapsed / 60000) + ' 分钟前';
+  if (elapsed < 86400000) return Math.floor(elapsed / 3600000) + ' 小时前';
+  return fallback;
+}
+module.exports = { relative: relative };

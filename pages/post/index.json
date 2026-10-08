@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "动态详情"
+  "navigationBarTitleText": "动态详情",
+  "usingComponents": {
+    "blob-avatar": "/components/blob-avatar/index"
+  }
 }

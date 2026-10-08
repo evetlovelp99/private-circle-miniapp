@@ -1,0 +1,8 @@
+/* Fallbacks also cover custom-tab-bar hosts outside the page variable scope. */
+.tab-shell { position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; padding: 16rpx 32rpx; padding-bottom: calc(16rpx + env(safe-area-inset-bottom)); pointer-events: none; box-sizing: border-box; }
+.tab-pill { display: flex; align-items: center; justify-content: space-around; height: 116rpx; background: var(--card, #FFFDF7); border: var(--line, 4rpx solid #2C2C2A); border-radius: 999rpx; pointer-events: auto; box-sizing: border-box; }
+.tab-pill button { margin: 0; box-sizing: border-box; }
+.tab-pill button::after { border: none; }
+.tab-pill .tab-link { display: flex; align-items: center; justify-content: center; min-width: 132rpx; height: 76rpx; padding: 0 24rpx; border: none; border-radius: 999rpx; background: transparent; color: var(--ink-2, #5F5E5A); font-size: 28rpx; font-weight: 600; line-height: 1; }
+.tab-pill .tab-link.tab-active { color: var(--blue-deep, #185FA5); }
+.tab-pill .tab-publish { display: flex; align-items: center; justify-content: center; flex: 0 0 84rpx; width: 84rpx; min-width: 84rpx; max-width: 84rpx; height: 84rpx; min-height: 84rpx; max-height: 84rpx; margin: 0; padding: 0; border: var(--line, 4rpx solid #2C2C2A); border-radius: 50%; background: var(--orange, #D85A30); color: #fff; font-size: 56rpx; font-weight: 600; line-height: 1; transform: translateY(-26rpx); }

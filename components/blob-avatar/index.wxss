@@ -1,0 +1,9 @@
+:host { display: inline-block; flex-shrink: 0; line-height: 0; }
+.blob-avatar { display: flex; align-items: center; justify-content: center; border: var(--line); border-radius: 50%; box-sizing: border-box; }
+.blob-blue { background: var(--blue); }
+.blob-yellow { background: var(--yellow); }
+.blob-green-soft { background: var(--green-soft); }
+.blob-pink { background: var(--pink); }
+.blob-orange { background: var(--orange); }
+.blob-eyes { display: flex; justify-content: space-between; width: 47%; height: 23%; transform: rotate(-5deg); }
+.blob-eye { width: 39%; height: 100%; background: #fff; border: var(--line); border-radius: 50%; box-sizing: border-box; }

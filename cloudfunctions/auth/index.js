@@ -101,6 +101,30 @@ async function handle(event) {
     return { ok: true, openid: OPENID, user };
   }
 
+  if (action === "updateNickname") {
+    const users = db.collection("users");
+    const profileRes = await users.where({ openid: OPENID }).limit(1).get();
+    // Mirrors cloudfunctions/post/index.js:isMember; keep these membership rules in sync.
+    const ownerOpenid = process.env.OWNER_OPENID;
+    let member = !!ownerOpenid && OPENID === ownerOpenid;
+    if (!member && ownerOpenid && profileRes.data.length) {
+      const relations = await db.collection("relations").where({
+        ownerUserId: ownerOpenid, viewerUserId: OPENID
+      }).limit(1).get();
+      member = !!relations.data.length;
+    }
+    if (!member) return { ok: false, msg: "仅圈子成员可改名" };
+    if (!profileRes.data.length) return { ok: false, msg: "用户资料不存在" };
+    if (typeof event.nickname !== "string") return { ok: false, msg: "昵称须为1至12个字符" };
+    const nickname = event.nickname.trim();
+    const length = Array.from(nickname).length;
+    if (length < 1 || length > 12) return { ok: false, msg: "昵称须为1至12个字符" };
+    // Update only this caller, including legacy duplicate profile records.
+    const updated = await users.where({ openid: OPENID }).update({ data: { nickname } });
+    if (!updated.stats.updated) return { ok: false, msg: "改名失败，请重试" };
+    return { ok: true, openid: OPENID, user: { ...profileRes.data[0], nickname } };
+  }
+
   return { ok: false, msg: "unknown action" };
 }
 

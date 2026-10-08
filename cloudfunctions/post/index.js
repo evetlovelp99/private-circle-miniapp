@@ -147,7 +147,6 @@ async function handle(event) {
     const hasMore = postRes.data.length > 20;
     const posts = postRes.data.slice(0, 20);
     const postIds = posts.map((p) => p._id);
-    const usersMap = await getUsersMap(posts.map((post) => post.authorId));
 
     let likes = [];
     let comments = [];
@@ -155,6 +154,23 @@ async function handle(event) {
       likes = await getAll("likes", { postId: _.in(postIds) });
       comments = await getAll("comments", { postId: _.in(postIds) });
     }
+
+    // Reuse the page-wide comments query above; never query comments per post.
+    // Preview content requires both membership and the post visibility filter above.
+    const previewsByPost = new Map();
+    if (postIds.length && await isMember(OPENID)) {
+      const newestFirst = comments.slice().sort((a, b) => {
+        if (a.createdAt !== b.createdAt) return a.createdAt > b.createdAt ? -1 : 1;
+        return a._id === b._id ? 0 : a._id > b._id ? -1 : 1;
+      });
+      for (const comment of newestFirst) {
+        const preview = previewsByPost.get(comment.postId) || [];
+        if (preview.length < 2) preview.push(comment);
+        previewsByPost.set(comment.postId, preview);
+      }
+    }
+    const previewAuthors = [...previewsByPost.values()].flat().map((comment) => comment.userId);
+    const usersMap = await getUsersMap([...posts.map((post) => post.authorId), ...previewAuthors]);
 
     const data = posts.map((post) => {
       const postLikes = likes.filter((l) => l.postId === post._id);
@@ -164,6 +180,10 @@ async function handle(event) {
         author: usersMap[post.authorId] || {},
         likeCount: postLikes.length,
         commentCount: postComments.length,
+        previewComments: (previewsByPost.get(post._id) || []).map((comment) => ({
+          nickname: usersMap[comment.userId]?.nickname || "匿名",
+          content: comment.content
+        })),
         liked: postLikes.some((l) => l.userId === OPENID)
       };
     });

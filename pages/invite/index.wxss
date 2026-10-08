@@ -1,12 +1,4 @@
-.title {
-  font-size: 32rpx;
-  font-weight: 600;
-  margin-bottom: 24rpx;
-}
-
-.input {
-  border: 1px solid #ddd;
-  border-radius: 10rpx;
-  padding: 20rpx;
-  margin-bottom: 20rpx;
-}
+.title { margin-bottom: 24rpx; }
+.input { margin-bottom: 24rpx; }
+button { margin-top: 16rpx; width: 100%; }
+.card { background: var(--yellow); }

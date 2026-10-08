@@ -1,9 +1,32 @@
-<view class="container">
-  <view class="card" wx:if="{{user}}">
-    <view>昵称：{{user.nickname || "未设置"}}</view>
-    <view>OpenID：{{openid}}</view>
+<view class="container profile-page">
+  <view class="page-heading"><view class="page-title">我的小角落</view><view class="page-note">在自己的节奏里，记录生活。</view></view>
+  <view class="card profile-card" wx:if="{{user}}">
+    <blob-avatar identity="{{openid || user.nickname}}" size="160" />
+    <view class="profile-name-row">
+      <view class="profile-name">{{user.nickname || '未设置'}}</view>
+      <button class="rename-pill" bindtap="openNicknameSheet" aria-label="修改昵称"><text aria-hidden="true">✎</text> 改名</button>
+    </view>
+    <view class="profile-label">OpenID</view>
+    <view class="profile-id">{{displayOpenid}}</view>
   </view>
-  <view class="card">
-    <button bindtap="goAdmin">进入管理页</button>
+  <view class="card management-card">
+    <view class="management-title">打理我的圈子</view>
+    <view class="page-note">邀请码与成员管理</view>
+    <button class="btn-primary" bindtap="goAdmin">进入管理页 →</button>
+  </view>
+</view>
+
+<view class="nickname-layer" wx:if="{{nicknameSheetOpen}}">
+  <view class="nickname-mask" bindtap="closeNicknameSheet" catchtouchmove="keepSheetOpen" />
+  <view class="nickname-sheet" catchtap="keepSheetOpen" role="dialog" aria-label="改个名字">
+    <view class="nickname-title">改个名字</view>
+    <view class="nickname-hint">圈友会看到这个名字，最多 12 个字</view>
+    <form bindsubmit="saveNickname">
+      <input class="nickname-input" type="nickname" name="nickname" value="{{nicknameDraft}}" maxlength="12" disabled="{{savingNickname}}" bindinput="onNicknameInput" bindblur="onNicknameBlur" bindnicknamereview="onNicknameReview" aria-label="昵称" />
+      <view class="nickname-actions">
+        <button class="nickname-cancel" disabled="{{savingNickname}}" bindtap="closeNicknameSheet">取消</button>
+        <button class="nickname-save" form-type="submit" loading="{{savingNickname}}" disabled="{{savingNickname}}">保存</button>
+      </view>
+    </form>
   </view>
 </view>

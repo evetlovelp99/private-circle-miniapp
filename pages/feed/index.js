@@ -4,6 +4,7 @@ const { formatTime } = require("../../utils/time");
 Page({
   data: {
     posts: [],
+    currentUser: null,
     openid: "",
     isAdmin: false,
     loading: false,
@@ -18,7 +19,8 @@ Page({
 
   async onShow() {
     try {
-      await ensureAuthed();
+      const user = await ensureAuthed();
+      this.setData({ currentUser: user });
       const session = await this.refreshSessionFlags();
       await this.loadPosts(session);
     } catch (error) {
@@ -105,6 +107,16 @@ Page({
       this.setData({ loading: false });
       wx.hideLoading();
     }
+  },
+
+  onPostMenu(e) {
+    const postId = e.currentTarget.dataset.id;
+    const post = this.data.posts.find((item) => item._id === postId);
+    if (!post || !post._canDelete) return;
+    wx.showActionSheet({
+      itemList: ["删除"],
+      success: (res) => { if (res.tapIndex === 0) this.onDeletePost(e); }
+    });
   },
 
   async onDeletePost(e) {

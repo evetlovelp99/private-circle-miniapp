@@ -1,74 +1,37 @@
-.post .head {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 12rpx;
-}
+.container.feed-page { padding-bottom: 220rpx; padding-bottom: calc(220rpx + env(safe-area-inset-bottom)); }
+.feed-intro { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 12rpx 8rpx 40rpx; }
+.intro-copy { flex: 1; min-width: 0; }
+.intro-eyebrow { font-size: 26rpx; color: var(--ink-2); word-break: break-all; }
+.intro-title { margin-top: 10rpx; font-size: 46rpx; font-weight: 600; line-height: 1.35; }
+.intro-subtitle { font-size: 23rpx; color: var(--ink-2); margin-top: 14rpx; }
+.head { display: flex; align-items: center; gap: 16rpx; margin-bottom: 24rpx; }
+.author-info { flex: 1; min-width: 0; }
+.name { font-size: 30rpx; font-weight: 600; word-break: break-all; }
+.time { color: var(--ink-2); font-size: 22rpx; margin-top: 4rpx; }
+.head .more-button { display: flex; align-items: center; justify-content: center; flex: 0 0 44rpx; width: 44rpx; min-width: 44rpx; max-width: 44rpx; height: 44rpx; min-height: 0; margin: 0 0 0 auto; padding: 0; border: none; border-radius: 0; background: transparent; color: var(--ink); font-size: 36rpx; line-height: 1; }
+.head .more-button::after { border: none; }
+.text { margin-bottom: 24rpx; font-size: 29rpx; line-height: 1.8; white-space: pre-wrap; word-break: break-word; }
+.audio-wrap { margin-bottom: 24rpx; padding: 12rpx; background: var(--blue-light); border: var(--line); border-radius: 24rpx; }
+.audio { width: 100%; }
+.video-wrap { position: relative; margin-bottom: 24rpx; border: var(--line); border-radius: 24rpx; overflow: hidden; }
+.feed-video { display: block; width: 100%; height: 360rpx; background: var(--ink); }
+.badge-live { position: absolute; top: 16rpx; left: 16rpx; background: var(--yellow); color: var(--ink); border: var(--line); border-radius: 999rpx; padding: 2rpx 16rpx; font-size: 22rpx; font-weight: 600; }
+.image-list { display: flex; flex-direction: column; gap: 16rpx; min-width: 0; margin-bottom: 24rpx; }
+.img { display: block; box-sizing: border-box; width: 100%; max-width: 100%; height: 360rpx; flex-shrink: 0; background: var(--bg); border: var(--line); border-radius: 24rpx; }
+.bar { display: flex; gap: 16rpx; padding-top: 8rpx; }
+.bar .action-button { display: flex; align-items: center; justify-content: center; gap: 12rpx; min-width: 116rpx; min-height: 72rpx; margin: 0; padding: 8rpx 24rpx; background: var(--card); }
+.bar .action-button.is-liked { background: var(--pink); }
+.bar .action-pressed { background: var(--blue-light); }
+.heart-icon { font-size: 38rpx; line-height: 1; }
+.comment-icon { width: 28rpx; height: 24rpx; border: 3rpx solid var(--ink); border-radius: 8rpx 8rpx 8rpx 0; }
+.action-count { font-size: 25rpx; }
+.empty { padding: 64rpx 24rpx; text-align: center; }
+.empty-mark { font-size: 60rpx; color: var(--orange); }
+.empty-title { font-size: 32rpx; font-weight: 600; margin-top: 16rpx; }
+.empty-description, .feed-end { font-size: 24rpx; color: var(--ink-2); margin-top: 16rpx; text-align: center; }
 
-.name {
-  font-weight: 600;
-}
-
-.time {
-  color: #999;
-  font-size: 24rpx;
-}
-
-.text {
-  margin-bottom: 14rpx;
-  word-break: break-word;
-}
-
-.audio-wrap {
-  margin-bottom: 14rpx;
-}
-
-.audio {
-  width: 100%;
-}
-
-.video-wrap {
-  position: relative;
-  margin-bottom: 14rpx;
-}
-
-.feed-video {
-  width: 100%;
-  max-height: 420rpx;
-  border-radius: 8rpx;
-  background: #000;
-}
-
-.badge-live {
-  position: absolute;
-  left: 12rpx;
-  top: 12rpx;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 22rpx;
-  padding: 6rpx 14rpx;
-  border-radius: 8rpx;
-}
-
-.image-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8rpx;
-  margin-bottom: 14rpx;
-}
-
-.img {
-  width: 30%;
-  height: 180rpx;
-  border-radius: 8rpx;
-}
-
-.bar {
-  display: flex;
-  gap: 12rpx;
-}
-
-.empty {
-  text-align: center;
-  color: #999;
-  margin-top: 100rpx;
-}
+.comment-preview { margin-top: 24rpx; padding: 16rpx 20rpx; background: var(--bg); border: none; border-radius: 20rpx; min-width: 0; }
+.preview-line { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 24rpx; line-height: 1.8; }
+.preview-nickname { color: var(--ink); font-weight: 600; }
+.preview-content { color: var(--ink-2); }
+.preview-all { color: var(--ink-2); font-size: 24rpx; padding-top: 12rpx; }

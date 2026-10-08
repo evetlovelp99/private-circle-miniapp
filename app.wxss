@@ -1,21 +1,52 @@
 page {
-  background: #f7f7f7;
+  --bg: #FAECE7;
+  --card: #FFFDF7;
+  --ink: #2C2C2A;
+  --ink-2: #5F5E5A;
+  --blue: #378ADD;
+  --blue-deep: #185FA5;
+  --blue-light: #B5D4F4;
+  --orange: #D85A30;
+  --yellow: #FAC775;
+  --green-soft: #97C459;
+  --pink: #F09595;
+  --line: 4rpx solid #2C2C2A;
+  --radius-card: 36rpx;
+  --radius-pill: 999rpx;
+  --radius-image: 24rpx;
+  --space-sm: 16rpx;
+  --space-md: 24rpx;
+  --space-lg: 32rpx;
+  background: var(--bg);
+  color: var(--ink);
   font-size: 28rpx;
-  color: #222;
+  line-height: 1.65;
 }
-
-.container {
-  padding: 24rpx;
-}
-
+view, button, input, textarea, image, video { box-sizing: border-box; }
+.container { padding: var(--space-lg) var(--space-md); }
 .card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  margin-bottom: 20rpx;
+  background: var(--card);
+  border: var(--line);
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
 }
-
-.btn-primary {
-  background: #1aad19;
-  color: #fff;
+button {
+  background: var(--card);
+  color: var(--ink);
+  border: var(--line);
+  border-radius: var(--radius-pill);
+  font-size: 26rpx;
+  font-weight: 600;
+  line-height: 1.5;
+  padding: 20rpx 28rpx;
 }
+button::after { border: none; }
+button[disabled] { opacity: 0.5; }
+.btn-primary { background: var(--blue); color: var(--card); }
+image { border: var(--line); border-radius: var(--radius-image); }
+input, textarea { color: var(--ink); }
+.title, .page-title { font-size: 36rpx; font-weight: 600; line-height: 1.35; }
+.page-heading { margin: 8rpx 8rpx 32rpx; }
+.page-note { color: var(--ink-2); font-size: 25rpx; margin-top: 12rpx; }
+.input { width: 100%; border: var(--line); border-radius: 24rpx; background: var(--card); padding: 20rpx; min-height: 92rpx; }

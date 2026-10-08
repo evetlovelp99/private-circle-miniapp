@@ -1,6 +1,6 @@
 const fs = require('fs'), vm = require('vm'), assert = require('assert');
 const root = require('path').resolve(__dirname, '..');
-let actor = 'owner', rows, mediaCalls, deleteCalls;
+let actor = 'owner', rows, mediaCalls, deleteCalls, queryCalls;
 const cmp=(op,v)=>({op,v});
 const command={in:v=>cmp('in',v),lt:v=>cmp('lt',v),lte:v=>cmp('lte',v),gt:v=>cmp('gt',v),or:v=>cmp('or',v),and:v=>cmp('and',v)};
 function matches(row,c) {
@@ -11,7 +11,7 @@ function matches(row,c) {
 class Query {
  constructor(name,c={}){this.name=name;this.c=c;this.orders=[];this.offset=0;this.size=20;}
  where(c){this.c=c;return this;} orderBy(k,d){this.orders.push([k,d]);return this;} skip(n){this.offset=n;return this;}limit(n){this.size=n;return this;}
- async get(){let data=rows[this.name].filter(x=>matches(x,this.c)); data.sort((a,b)=>{for(const [k,d] of this.orders){if(a[k]!==b[k])return (a[k]<b[k]?-1:1)*(d==='desc'?-1:1);}return 0;});return {data:data.slice(this.offset,this.offset+this.size).map(x=>({...x}))};}
+ async get(){queryCalls.push({name:this.name,condition:this.c});let data=rows[this.name].filter(x=>matches(x,this.c)); data.sort((a,b)=>{for(const [k,d] of this.orders){if(a[k]!==b[k])return (a[k]<b[k]?-1:1)*(d==='desc'?-1:1);}return 0;});return {data:data.slice(this.offset,this.offset+this.size).map(x=>({...x}))};}
  async update({data}){const found=rows[this.name].filter(x=>matches(x,this.c));found.forEach(x=>Object.assign(x,data));return {stats:{updated:found.length}};}
  async add({data}){const id=data._id||`${this.name}-${rows[this.name].length}-${Math.random()}`;if(rows[this.name].some(x=>x._id===id))throw Error('duplicate');rows[this.name].push({...data,_id:id});return {_id:id};}
  doc(id){return {get:async()=>{const data=rows[this.name].find(x=>x._id===id);if(!data)throw Error('missing');return {data:{...data}};},remove:async()=>{rows[this.name]=rows[this.name].filter(x=>x._id!==id);return {stats:{removed:1}};}};}
@@ -21,7 +21,167 @@ const cloud={init(){},database:()=>db,getWXContext:()=>({OPENID:actor}),getTempF
 const env={OWNER_OPENID:'owner'};
 function load(name){const sandbox={require:n=>n==='wx-server-sdk'?cloud:require(n),exports:{},process:{env},console:{error(){}},Date,Set};vm.runInNewContext(fs.readFileSync(`${root}/cloudfunctions/${name}/index.js`,'utf8'),sandbox);return sandbox.exports.main;}
 const auth=load('auth'),admin=load('admin'),post=load('post');
-function reset(){rows={users:[],relations:[],inviteCodes:[],posts:[],likes:[],comments:[]};mediaCalls=[];deleteCalls=[];actor='owner';env.OWNER_OPENID='owner';}
+function reset(){rows={users:[],relations:[],inviteCodes:[],posts:[],likes:[],comments:[]};mediaCalls=[];deleteCalls=[];queryCalls=[];actor='owner';env.OWNER_OPENID='owner';}
+
+async function previewTests() {
+ reset();
+ rows.users.push({_id:'owner',openid:'owner',nickname:'创建者'}, {_id:'member',openid:'member',nickname:'圈友'});
+ rows.relations.push({_id:'r',ownerUserId:'owner',viewerUserId:'member',canViewUntil:'2026-10-08T00:00:00.000Z'});
+ for (const id of ['p1','p2','empty']) rows.posts.push({_id:id,authorId:'owner',text:id,images:[],createdAt:'2026-10-07T00:00:00.000Z'});
+ rows.posts.push({_id:'hidden',authorId:'owner',text:'hidden',images:[],createdAt:'2026-10-09T00:00:00.000Z'});
+ for (let i=0;i<125;i++) rows.comments.push({_id:`old${i}`,postId:'p1',userId:'member',content:'older',createdAt:'2026-10-06T00:00:00.000Z'});
+ rows.comments.push(
+  {_id:'a',postId:'p1',userId:'member',content:'tie older',createdAt:'2026-10-07T12:00:00.000Z'},
+  {_id:'z',postId:'p1',userId:'owner',content:'tie newer',createdAt:'2026-10-07T12:00:00.000Z'},
+  {_id:'single',postId:'p2',userId:'missing-user',content:'single comment',createdAt:'2026-10-07T00:00:00.000Z'},
+  {_id:'secret',postId:'hidden',userId:'owner',content:'secret comment',createdAt:'2026-10-09T00:00:00.000Z'}
+ );
+ actor='member';
+ let result=await post({action:'listPosts'});
+ const find=id=>result.data.find(p=>p._id===id);
+ assert.equal(find('p1').commentCount,127);
+ assert.deepEqual(Array.from(find('p1').previewComments,c=>c.content),['tie newer','tie older']);
+ assert.equal(find('p1').previewComments[0].nickname,'创建者');
+ assert.deepEqual(Object.keys(find('p1').previewComments[0]).sort(),['content','nickname']);
+ assert.equal(find('p2').previewComments.length,1); assert.equal(find('p2').previewComments[0].nickname,'匿名');
+ assert.equal(find('empty').previewComments.length,0);assert.ok(!find('hidden'));
+ assert.ok(!JSON.stringify(result).includes('secret comment'));
+ const commentQueries=queryCalls.filter(q=>q.name==='comments');
+ assert.equal(commentQueries.length,2); // 128 comments, fetched in page-wide batches of 100.
+ assert.ok(commentQueries.every(q=>q.condition.postId.op==='in' && q.condition.postId.v.length===3));
+ await post({action:'addComment',postId:'p1',content:'newly added'});
+ result=await post({action:'listPosts'});assert.equal(find('p1').previewComments[0].content,'newly added');
+ const latest=rows.comments.find(c=>c.content==='newly added');
+ await db.collection('comments').doc(latest._id).remove(); // Current model uses physical deletion.
+ result=await post({action:'listPosts'});assert.equal(find('p1').previewComments[0].content,'tie newer');
+ // Membership and post visibility are both required, including legacy own-post records.
+ actor='stranger';rows.posts.push({_id:'own',authorId:'stranger',text:'own',images:[],createdAt:'2026-10-07T00:00:00.000Z'});
+ rows.comments.push({_id:'own-comment',postId:'own',userId:'owner',content:'private content',createdAt:'2026-10-07T00:00:00.000Z'});
+ result=await post({action:'listPosts'});assert.equal(find('own').previewComments.length,0);assert.ok(!JSON.stringify(result).includes('private content'));
+ actor='owner';result=await post({action:'listPosts'});assert.equal(find('p1').previewComments.length,2);
+ // Feed onShow already reloads the list after returning from detail.
+ let page, refreshes=0;
+ vm.runInNewContext(fs.readFileSync(`${root}/pages/feed/index.js`,'utf8'),{Page:x=>page=x,require:()=>({ensureAuthed:async()=>({nickname:'圈友'})}),console});
+ page.setData=patch=>Object.assign(page.data,patch); page.refreshSessionFlags=async()=>({openid:'member'});
+ page.loadPosts=async()=>{refreshes++;};await page.onShow();await page.onShow();assert.equal(refreshes,2);
+ console.log('PASS: comment previews (0/1/2+, newest/tied ordering, 100+ batching, nickname-only payload, membership/visibility, addition/removal, return refresh)');
+}
+
+async function nicknameTests() {
+ reset();
+ rows.users.push({_id:'owner',openid:'owner',nickname:'创建者'}, {_id:'member',openid:'member',nickname:'旧昵称',avatar:'unchanged'}, {_id:'legacy-member',openid:'member',nickname:'旧昵称'});
+ rows.relations.push({_id:'r',ownerUserId:'owner',viewerUserId:'member',canViewUntil:'2026-01-01T00:00:00.000Z'});
+ actor='member';
+ const before=JSON.stringify(rows.users);
+ for (const nickname of [undefined,null,123,'','   ','字'.repeat(13),'😀'.repeat(13)]) {
+  const result=await auth({action:'updateNickname',nickname});assert.equal(result.ok,false);assert.ok(result.msg);
+ }
+ assert.equal(JSON.stringify(rows.users),before);
+ for (const nickname of ['字','字'.repeat(12),'😀'.repeat(12)]) assert.equal((await auth({action:'updateNickname',nickname})).ok,true);
+ const changed=await auth({action:'updateNickname',nickname:'  新昵称  ',openid:'owner'});
+ assert.equal(changed.ok,true);assert.equal(changed.openid,'member');assert.equal(changed.user.nickname,'新昵称');
+ assert.equal(rows.users.find(u=>u.openid==='owner').nickname,'创建者');
+ assert.ok(rows.users.filter(u=>u.openid==='member').every(u=>u.nickname==='新昵称'));
+ assert.equal(changed.user.avatar,'unchanged');
+ assert.equal((await auth({action:'getSession'})).user.nickname,'新昵称');
+ // Historical posts and comments resolve current names, without record migrations.
+ rows.posts.push({_id:'p',authorId:'member',text:'old post',images:[],createdAt:'2025-01-01T00:00:00.000Z'});
+ rows.comments.push({_id:'c',postId:'p',userId:'member',content:'old comment',createdAt:'2025-01-01T00:00:00.000Z'});
+ const feed=await post({action:'listPosts'});assert.equal(feed.data[0].author.nickname,'新昵称');assert.equal(feed.data[0].previewComments[0].nickname,'新昵称');
+ const detail=await post({action:'getPostDetail',postId:'p'});assert.equal(detail.post.author.nickname,'新昵称');assert.equal(detail.comments[0].user.nickname,'新昵称');
+ actor='owner';assert.equal((await auth({action:'updateNickname',nickname:'新创建者'})).ok,true);
+ actor='stranger';assert.equal((await auth({action:'updateNickname',nickname:'no'})).ok,false);
+ rows.users.push({_id:'stranger',openid:'stranger',nickname:'no relation'});
+ assert.equal((await auth({action:'updateNickname',nickname:'no'})).ok,false);
+ actor='member';delete env.OWNER_OPENID;assert.equal((await auth({action:'updateNickname',nickname:'no'})).ok,false);
+ env.OWNER_OPENID='owner';rows.users=rows.users.filter(u=>u.openid!=='member');assert.equal((await auth({action:'updateNickname',nickname:'no'})).ok,false);
+ actor='owner';rows.users=rows.users.filter(u=>u.openid!=='owner');assert.equal((await auth({action:'updateNickname',nickname:'no'})).ok,false);
+
+ // Exercise the real auth cache helper: it uses globalData, not wx storage.
+ const app={globalData:{user:{openid:'member',nickname:'旧昵称'},openid:'123456789012345678901234'}};
+ let response={ok:false,msg:'昵称须为1至12个字符'}, calls=0, release, networkFailure=false;
+ const toasts=[], requests=[];
+ const wx={cloud:{callFunction:async args=>{calls++;requests.push(args);if(networkFailure)throw Error('网络异常');return release?await new Promise(resolve=>{release=()=>resolve({result:response});}):{result:response};}},showToast:x=>toasts.push(x.title)};
+ const helper={module:{exports:{}},getApp:()=>app,wx,Promise,Error};
+ vm.runInNewContext(fs.readFileSync(`${root}/utils/auth.js`,'utf8'),helper);
+ function client(name) {
+  let page;
+  vm.runInNewContext(fs.readFileSync(`${root}/pages/${name}/index.js`,'utf8'),{Page:x=>page=x,require:()=>helper.module.exports,getApp:()=>app,wx,console});
+  page.data={...page.data};page.setData=patch=>Object.assign(page.data,patch);return page;
+ }
+ const me=client('me');await me.onShow();assert.equal(me.data.displayOpenid,'12345678…901234');
+ me.openNicknameSheet();assert.equal(me.data.nicknameDraft,'旧昵称');
+ me.onNicknameInput({detail:{value:'输入名字'}});me.onNicknameBlur({detail:{value:'微信昵称'}});assert.equal(me.data.nicknameDraft,'微信昵称');
+ await me.saveNickname();assert.equal(toasts.at(-1),response.msg);assert.equal(me.data.nicknameSheetOpen,true);assert.equal(app.globalData.user.nickname,'旧昵称');
+ networkFailure=true;await me.saveNickname();assert.equal(toasts.at(-1),'网络异常');assert.equal(me.data.nicknameSheetOpen,true);assert.equal(me.data.savingNickname,false);networkFailure=false;
+ response={ok:true,user:{openid:'member',nickname:'新昵称'}};
+ release=true;const pending=me.saveNickname({detail:{value:{nickname:'表单最终值'}}});
+ await me.saveNickname();assert.equal(calls,3);me.closeNicknameSheet();assert.equal(me.data.nicknameSheetOpen,true);
+ release();await pending;release=null;
+ assert.equal(requests.at(-1).data.nickname,'表单最终值');assert.deepEqual(Object.keys(requests.at(-1).data).sort(),['action','nickname']);
+ assert.equal(app.globalData.user.nickname,'新昵称');assert.equal(me.data.user.nickname,'新昵称');assert.equal(me.data.nicknameSheetOpen,false);assert.equal(toasts.at(-1),'已改名');
+ const home=client('feed');home.refreshSessionFlags=async()=>({openid:'member'});home.loadPosts=async()=>{};
+ home.data.currentUser={nickname:'stale'};await home.onShow();assert.equal(home.data.currentUser.nickname,'新昵称');
+ const publish=client('create');await publish.onShow();assert.equal(publish.data.currentUser.nickname,'新昵称');
+ me.openNicknameSheet();me.onNicknameInput({detail:{value:'取消草稿'}});me.closeNicknameSheet();assert.equal(me.data.nicknameSheetOpen,false);assert.equal(me.data.user.nickname,'新昵称');
+ console.log('PASS: nickname membership/ownership, Unicode boundaries/trim, legacy duplicates, historical names, blur/form values, cloud/network errors, duplicate submit, cache and feed/publish refresh');
+}
+
+async function nicknameSheetTests() {
+ function fixture(support=true) {
+  const app={globalData:{user:{openid:'member',nickname:'旧昵称'},openid:'member'}};
+  const timers=new Map(),toasts=[],requests=[];let nextTimer=0,page;
+  const tab={data:{hidden:false,selected:''},setData(p){Object.assign(this.data,p);},syncSelection(){this.data.selected='/pages/me/index';}};
+  let result={ok:true,user:{openid:'member',nickname:'新昵称'}};
+  const wx={showToast:x=>toasts.push(x.title),cloud:{callFunction:async args=>{requests.push(args);return {result};}}};
+  if(support!==undefined && support!==null)wx.canIUse=key=>{assert.equal(key,'input.bindnicknamereview');return support;};
+  vm.runInNewContext(fs.readFileSync(`${root}/pages/me/index.js`,'utf8'),{
+   Page:x=>page=x,require:()=>({ensureAuthed:async()=>app.globalData.user}),getApp:()=>app,wx,console,
+   setTimeout:(fn,delay)=>{assert.equal(delay,3000);const id=++nextTimer;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id)
+  });
+  page.data={...page.data,user:app.globalData.user};page.setData=p=>Object.assign(page.data,p);page.getTabBar=()=>tab;
+  return {page,tab,toasts,requests,timers,app,setResult:r=>result=r,expire(){for(const fn of [...timers.values()])fn();}};
+ }
+ // Unchanged prefill closes without a request, toast or review wait.
+ let f=fixture();await f.page.onShow();assert.equal(f.tab.data.hidden,false);assert.equal(f.tab.data.selected,'/pages/me/index');
+ f.page.openNicknameSheet();assert.equal(f.tab.data.hidden,true);await f.page.saveNickname();assert.equal(f.requests.length,0);assert.equal(f.toasts.length,0);assert.equal(f.tab.data.hidden,false);
+ // Missing canIUse and unsupported events both save normally.
+ for(const support of [false,null]) {
+  f=fixture(support);f.page.openNicknameSheet();f.page.onNicknameBlur({detail:{value:'新昵称'}});await f.page.saveNickname();
+  assert.equal(f.requests.length,1);assert.equal(f.timers.size,0);assert.equal(f.tab.data.hidden,false);
+ }
+ // Simulator/no callback fallback waits exactly 3 seconds; waiting is not saving.
+ f=fixture();f.page.openNicknameSheet();f.page.onNicknameInput({detail:{value:'新昵称'}});
+ let pending=f.page.saveNickname();assert.equal(f.requests.length,0);assert.equal(f.page.data.savingNickname,false);assert.equal(f.timers.size,1);
+ await f.page.saveNickname();assert.equal(f.timers.size,1);f.expire();await pending;assert.equal(f.requests.length,1);assert.equal(f.tab.data.hidden,false);assert.equal(f.timers.size,0);
+ // A passing callback releases the wait immediately, including form final-value changes.
+ f=fixture();f.page.openNicknameSheet();pending=f.page.saveNickname({detail:{value:{nickname:'新昵称'}}});assert.equal(f.requests.length,0);
+ f.page.onNicknameReview({detail:{pass:true}});await pending;assert.equal(f.requests.length,1);assert.equal(f.timers.size,0);
+ // Explicit failure blocks retries and later pass callbacks until the value changes.
+ f=fixture();f.page.openNicknameSheet();f.page.onNicknameInput({detail:{value:'不通过'}});pending=f.page.saveNickname();
+ f.page.onNicknameReview({detail:{pass:false}});await pending;assert.equal(f.requests.length,0);assert.equal(f.tab.data.hidden,true);assert.equal(f.page.data.nicknameSheetOpen,true);
+ assert.equal(f.toasts.at(-1),'这个名字没通过微信检测，换一个吧');f.page.onNicknameReview({detail:{pass:true}});await f.page.saveNickname();assert.equal(f.requests.length,0);
+ f.page.onNicknameBlur({detail:{value:'新昵称'}});pending=f.page.saveNickname();f.expire();await pending;assert.equal(f.requests.length,1);
+ // Already-reviewed values must not be invalidated by blur carrying the same value.
+ f=fixture();f.page.openNicknameSheet();f.page.onNicknameInput({detail:{value:'新昵称'}});f.page.onNicknameReview({detail:{pass:true}});
+ f.page.onNicknameBlur({detail:{value:'新昵称'}});await f.page.saveNickname();assert.equal(f.requests.length,1);assert.equal(f.timers.size,0);
+ // Closing, leaving the page, or editing during a wait cancels the queued save.
+ for(const action of ['close','hide','edit']) {
+  f=fixture();f.page.openNicknameSheet();f.page.onNicknameInput({detail:{value:'新昵称'}});pending=f.page.saveNickname();
+  if(action==='close')f.page.closeNicknameSheet();else if(action==='hide')f.page.onHide();else f.page.onNicknameInput({detail:{value:'另一个'}});
+  await pending;f.expire();assert.equal(f.requests.length,0);assert.equal(f.timers.size,0);
+  if(action!=='edit') {assert.equal(f.tab.data.hidden,false);assert.equal(f.page.data.nicknameSheetOpen,false);}
+ }
+ // Cloud rejection leaves the sheet open and tabBar hidden, with no stuck saving state.
+ f=fixture(false);f.setResult({ok:false,msg:'云端拒绝'});f.page.openNicknameSheet();f.page.onNicknameInput({detail:{value:'新昵称'}});await f.page.saveNickname();
+ assert.equal(f.page.data.savingNickname,false);assert.equal(f.page.data.nicknameSheetOpen,true);assert.equal(f.tab.data.hidden,true);assert.equal(f.toasts.at(-1),'云端拒绝');
+ f.page.closeNicknameSheet();assert.equal(f.tab.data.hidden,false);f.page.openNicknameSheet();f.page.onHide();await f.page.onShow();assert.equal(f.tab.data.hidden,false);assert.equal(f.tab.data.selected,'/pages/me/index');
+ // Both absent and temporarily unmounted custom tabBar handles are safe.
+ f=fixture();delete f.page.getTabBar;await f.page.onShow();f.page.openNicknameSheet();f.page.closeNicknameSheet();f.page.onHide();
+ f.page.getTabBar=()=>undefined;await f.page.onShow();f.page.openNicknameSheet();f.page.onHide();
+ console.log('PASS: sheet/tabBar lifecycle, unchanged prefill, unsupported API, 3s fallback, explicit fail/change, blur/form review, wait cancellation, retry state');
+}
+
 async function run(){
  reset();delete env.OWNER_OPENID;assert.equal((await admin({action:'createInviteCode'})).ok,false);assert.equal((await auth({action:'bootstrapOwner'})).ok,false);
  env.OWNER_OPENID='owner';actor='stranger';assert.equal((await auth({action:'bootstrapOwner'})).ok,false);assert.equal((await post({action:'createPost',text:'x',images:[]})).ok,false);
@@ -61,6 +221,9 @@ async function run(){
  const detailPage=client('post');detailPage.data.content='draft';detailPage.loadDetail=()=>{throw Error('unexpected reload');};await detailPage.submitComment();assert.equal(detailPage.data.content,'draft');
  const feedPage=client('feed');feedPage.loadPosts=()=>{throw Error('unexpected reload');};await feedPage.onLikeTap({currentTarget:{dataset:{id:'p'}}});
  assert.ok(toasts.every(x=>x==='server rejected'));
+ await previewTests();
+ await nicknameTests();
+ await nicknameSheetTests();
  console.log('PASS: owner fail-closed, input validation, atomic invite redemption, idempotent user creation, deterministic concurrent likes, cutoff query, tied timestamp pagination (45 posts), enrichment/detail (125 records), media permission/batching, cascading deletion');
 }
 run().catch(e=>{console.error(e);process.exitCode=1;});

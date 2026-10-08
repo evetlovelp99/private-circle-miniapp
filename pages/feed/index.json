@@ -1,5 +1,8 @@
 {
   "navigationBarTitleText": "私密动态",
   "enablePullDownRefresh": true,
-  "onReachBottomDistance": 80
+  "onReachBottomDistance": 80,
+  "usingComponents": {
+    "blob-avatar": "/components/blob-avatar/index"
+  }
 }

@@ -10,13 +10,13 @@
   ],
   "window": {
     "navigationBarTitleText": "小圈子",
-    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarBackgroundColor": "#FAECE7",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f7f7f7"
+    "backgroundColor": "#FAECE7"
   },
   "tabBar": {
-    "color": "#666666",
-    "selectedColor": "#1aad19",
+    "color": "#5F5E5A",
+    "selectedColor": "#185FA5",
     "list": [
       {
         "pagePath": "pages/feed/index",
@@ -30,7 +30,9 @@
         "pagePath": "pages/me/index",
         "text": "我的"
       }
-    ]
+    ],
+    "custom": true,
+    "backgroundColor": "#FFFDF7"
   },
   "cloud": true,
   "style": "v2",

@@ -2,6 +2,7 @@ const { ensureAuthed } = require("../../utils/auth");
 
 Page({
   data: {
+    currentUser: null,
     text: "",
     images: [],
     submitting: false,
@@ -16,7 +17,8 @@ Page({
 
   async onShow() {
     try {
-      await ensureAuthed();
+      const user = await ensureAuthed();
+      this.setData({ currentUser: user });
     } catch (error) {
       console.error(error);
     }

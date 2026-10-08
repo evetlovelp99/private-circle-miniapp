@@ -1,52 +1,10 @@
-.hint {
-  color: #888;
-  margin: 24rpx;
-  font-size: 26rpx;
-}
-
-.member .row {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  margin-bottom: 12rpx;
-}
-
-.name {
-  font-weight: 600;
-}
-
-.openid {
-  font-size: 24rpx;
-  color: #666;
-  word-break: break-all;
-  margin-bottom: 16rpx;
-}
-
-.actions {
-  display: flex;
-  gap: 12rpx;
-}
-
-.tag {
-  font-size: 22rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 8rpx;
-}
-
-.tag.ok {
-  background: #e8f8e8;
-  color: #1aad19;
-}
-
-.tag.muted {
-  background: #f0f0f0;
-  color: #999;
-}
-
-.muted {
-  color: #888;
-}
-
-.small {
-  font-size: 24rpx;
-}
+.hint { color: var(--ink-2); margin: 24rpx 8rpx; font-size: 26rpx; }
+.member .row { display: flex; align-items: center; flex-wrap: wrap; gap: 16rpx; margin-bottom: 20rpx; }
+.name { flex: 1; min-width: 100rpx; word-break: break-all; font-size: 30rpx; font-weight: 600; }
+.openid { font-size: 24rpx; color: var(--ink-2); word-break: break-all; margin-bottom: 20rpx; }
+.actions button { margin: 0; }
+.tag { font-size: 22rpx; padding: 4rpx 16rpx; border: var(--line); border-radius: 999rpx; font-weight: 600; }
+.tag.ok { background: var(--green-soft); }
+.tag.muted { background: var(--pink); }
+.muted { color: var(--ink-2); }
+.small { font-size: 24rpx; }

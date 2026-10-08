@@ -1,4 +1,5 @@
 <view class="container">
+  <view class="page-heading"><view class="page-title">欢迎来到小圈子</view><view class="page-note">把生活的小片段，分享给亲近的人。</view></view>
   <view class="card">
     <view class="title">输入邀请码进入私密圈</view>
     <input

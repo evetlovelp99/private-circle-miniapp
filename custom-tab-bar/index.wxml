@@ -1,0 +1,7 @@
+<view class="tab-shell" wx:if="{{!hidden}}">
+  <view class="tab-pill">
+    <button class="tab-link {{selected === '/pages/feed/index' ? 'tab-active' : ''}}" data-url="/pages/feed/index" bindtap="switchTab" aria-label="首页">首页</button>
+    <button class="tab-publish {{selected === '/pages/create/index' ? 'publish-active' : ''}}" data-url="/pages/create/index" bindtap="switchTab" aria-label="发布动态">+</button>
+    <button class="tab-link {{selected === '/pages/me/index' ? 'tab-active' : ''}}" data-url="/pages/me/index" bindtap="switchTab" aria-label="我的">我的</button>
+  </view>
+</view>
