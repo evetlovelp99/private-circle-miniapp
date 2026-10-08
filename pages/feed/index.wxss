@@ -4,6 +4,20 @@
 .intro-eyebrow { font-size: 26rpx; color: var(--ink-2); word-break: break-all; }
 .intro-title { margin-top: 10rpx; font-size: 46rpx; font-weight: 600; line-height: 1.35; }
 .intro-subtitle { font-size: 23rpx; color: var(--ink-2); margin-top: 14rpx; }
+.stats-row { display: flex; gap: var(--space-md); margin-bottom: var(--space-md); }
+.stats-card { flex: 1; min-width: 0; padding: 24rpx; border: var(--line); border-radius: var(--radius-card); }
+.stats-members { background: var(--blue-light); }
+.stats-today { background: var(--yellow); }
+.stats-label { font-size: 26rpx; font-weight: 600; }
+.stats-members .stats-label { color: var(--blue-deep); }
+.stats-value { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10rpx; margin: 8rpx 0; font-size: 52rpx; font-weight: 600; overflow-wrap: anywhere; }
+.stats-unit, .stats-caption { font-size: 24rpx; font-weight: 400; }
+.stats-caption { height: 40rpx; line-height: 40rpx; color: var(--ink-2); }
+.stats-dots { display: flex; height: 40rpx; align-items: center; padding-left: 8rpx; }
+.stats-dot { width: 40rpx; height: 40rpx; margin-left: -8rpx; border: var(--line); border-radius: var(--radius-pill); }
+.dot-orange { background: var(--orange); }
+.dot-yellow { background: var(--yellow); }
+.dot-pink { background: var(--pink); }
 .head { display: flex; align-items: center; gap: 16rpx; margin-bottom: 24rpx; }
 .author-info { flex: 1; min-width: 0; }
 .name { font-size: 30rpx; font-weight: 600; word-break: break-all; }

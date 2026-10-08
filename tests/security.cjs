@@ -2,11 +2,11 @@ const fs = require('fs'), vm = require('vm'), assert = require('assert');
 const root = require('path').resolve(__dirname, '..');
 let actor = 'owner', rows, mediaCalls, deleteCalls, queryCalls;
 const cmp=(op,v)=>({op,v});
-const command={in:v=>cmp('in',v),lt:v=>cmp('lt',v),lte:v=>cmp('lte',v),gt:v=>cmp('gt',v),or:v=>cmp('or',v),and:v=>cmp('and',v)};
+const command={in:v=>cmp('in',v),lt:v=>cmp('lt',v),lte:v=>cmp('lte',v),gt:v=>cmp('gt',v),gte:v=>cmp('gte',v),or:v=>cmp('or',v),and:v=>cmp('and',v)};
 function matches(row,c) {
  if(c.op==='or')return c.v.some(x=>matches(row,x));
  if(c.op==='and')return c.v.every(x=>matches(row,x));
- return Object.entries(c).every(([k,v])=>v && v.op ? ({in:()=>v.v.includes(row[k]),lt:()=>row[k]<v.v,lte:()=>row[k]<=v.v,gt:()=>row[k]>v.v}[v.op])() : row[k]===v);
+ return Object.entries(c).every(([k,v])=>v && v.op ? ({in:()=>v.v.includes(row[k]),lt:()=>row[k]<v.v,lte:()=>row[k]<=v.v,gt:()=>row[k]>v.v,gte:()=>row[k]>=v.v}[v.op])() : row[k]===v);
 }
 class Query {
  constructor(name,c={}){this.name=name;this.c=c;this.orders=[];this.offset=0;this.size=20;}
@@ -19,7 +19,7 @@ class Query {
 const db={command,collection:n=>new Query(n)};
 const cloud={init(){},database:()=>db,getWXContext:()=>({OPENID:actor}),getTempFileURL:async({fileList})=>{mediaCalls.push(fileList);return {fileList:fileList.map(fileID=>({fileID,tempFileURL:`https://media/${fileID}`,status:0}))};},deleteFile:async({fileList})=>{deleteCalls.push(fileList);return {fileList:fileList.map(fileID=>({fileID,status:0}))};}};
 const env={OWNER_OPENID:'owner'};
-function load(name){const sandbox={require:n=>n==='wx-server-sdk'?cloud:require(n),exports:{},process:{env},console:{error(){}},Date,Set};vm.runInNewContext(fs.readFileSync(`${root}/cloudfunctions/${name}/index.js`,'utf8'),sandbox);return sandbox.exports.main;}
+function load(name, Clock=Date){const sandbox={require:n=>n==='wx-server-sdk'?cloud:require(n),exports:{},process:{env},console:{error(){}},Date:Clock,Set};vm.runInNewContext(fs.readFileSync(`${root}/cloudfunctions/${name}/index.js`,'utf8'),sandbox);return sandbox.exports.main;}
 const auth=load('auth'),admin=load('admin'),post=load('post');
 function reset(){rows={users:[],relations:[],inviteCodes:[],posts:[],likes:[],comments:[]};mediaCalls=[];deleteCalls=[];queryCalls=[];actor='owner';env.OWNER_OPENID='owner';}
 
@@ -63,7 +63,7 @@ async function previewTests() {
  let page, refreshes=0;
  vm.runInNewContext(fs.readFileSync(`${root}/pages/feed/index.js`,'utf8'),{Page:x=>page=x,require:()=>({ensureAuthed:async()=>({nickname:'圈友'})}),console});
  page.setData=patch=>Object.assign(page.data,patch); page.refreshSessionFlags=async()=>({openid:'member'});
- page.loadPosts=async()=>{refreshes++;};await page.onShow();await page.onShow();assert.equal(refreshes,2);
+ page.loadStats=async()=>{};page.loadPosts=async()=>{refreshes++;};await page.onShow();await page.onShow();assert.equal(refreshes,2);
  console.log('PASS: comment previews (0/1/2+, newest/tied ordering, 100+ batching, nickname-only payload, membership/visibility, addition/removal, return refresh)');
 }
 
@@ -120,7 +120,7 @@ async function nicknameTests() {
  release();await pending;release=null;
  assert.equal(requests.at(-1).data.nickname,'表单最终值');assert.deepEqual(Object.keys(requests.at(-1).data).sort(),['action','nickname']);
  assert.equal(app.globalData.user.nickname,'新昵称');assert.equal(me.data.user.nickname,'新昵称');assert.equal(me.data.nicknameSheetOpen,false);assert.equal(toasts.at(-1),'已改名');
- const home=client('feed');home.refreshSessionFlags=async()=>({openid:'member'});home.loadPosts=async()=>{};
+ const home=client('feed');home.refreshSessionFlags=async()=>({openid:'member'});home.loadPosts=async()=>{};home.loadStats=async()=>{};
  home.data.currentUser={nickname:'stale'};await home.onShow();assert.equal(home.data.currentUser.nickname,'新昵称');
  const publish=client('create');await publish.onShow();assert.equal(publish.data.currentUser.nickname,'新昵称');
  me.openNicknameSheet();me.onNicknameInput({detail:{value:'取消草稿'}});me.closeNicknameSheet();assert.equal(me.data.nicknameSheetOpen,false);assert.equal(me.data.user.nickname,'新昵称');
@@ -182,6 +182,94 @@ async function nicknameSheetTests() {
  console.log('PASS: sheet/tabBar lifecycle, unchanged prefill, unsupported API, 3s fallback, explicit fail/change, blur/form review, wait cancellation, retry state');
 }
 
+async function statsTests() {
+ reset();
+ const hour=3600000, start=Date.parse('2026-10-08T07:00:00.000Z');
+ let now=start+12*hour;
+ class Clock extends Date { constructor(...args){super(...(args.length?args:[now]));} static now(){return now;} }
+ const stats=load('auth',Clock);
+ const payload={action:'getStats',dayStart:start,dayEnd:start+24*hour};
+ const iso=t=>new Date(t).toISOString();
+ rows.users.push({_id:'m',openid:'member'},{_id:'dup',openid:'member'},{_id:'orphan',openid:'orphan'});
+ rows.relations.push({_id:'r',ownerUserId:'owner',viewerUserId:'member',canViewUntil:iso(start+hour)},
+  {_id:'r2',ownerUserId:'owner',viewerUserId:'member',canViewUntil:iso(start+hour)},
+  {_id:'missing',ownerUserId:'owner',viewerUserId:'no-profile'});
+ // Owner counts even before bootstrap; duplicates and incomplete memberships do not.
+ let result=await stats(payload);assert.equal(result.ok,true);assert.equal(result.memberCount,2);assert.equal(result.todayPostCount,0);
+ for(const [id,authorId,time] of [
+  ['before','owner',start-1],['start','owner',start],['cutoff','owner',start+hour],
+  ['after-cutoff','owner',start+hour+1],['end','owner',start+24*hour],
+  ['own','member',start+2*hour],['secret','stranger',start+hour]
+ ])rows.posts.push({_id:id,authorId,createdAt:iso(time),text:id,images:[]});
+ actor='member';result=await stats({...payload,openid:'owner'});assert.equal(result.todayPostCount,3);
+ const feed=await post({action:'listPosts'});
+ assert.equal(result.todayPostCount,feed.data.filter(p=>p.createdAt>=iso(start)&&p.createdAt<iso(payload.dayEnd)).length);
+ for(const id of ['stranger','orphan','no-profile']){actor=id;assert.equal((await stats({...payload,openid:'owner'})).ok,false);}
+ actor='member';delete env.OWNER_OPENID;assert.equal((await stats(payload)).ok,false);env.OWNER_OPENID='owner';
+ actor='owner';
+ for(const patch of [
+  {dayStart:undefined},{dayEnd:undefined},{dayStart:String(start)},{dayEnd:null},
+  {dayStart:NaN},{dayEnd:Infinity},{dayStart:-Infinity},
+  {dayEnd:start+23*hour-1},{dayEnd:start+25*hour+1},
+  {dayStart:start-7*24*hour,dayEnd:start-6*24*hour}
+ ]){const rejected=await stats({...payload,...patch});assert.equal(rejected.ok,false);assert.ok(rejected.msg);}
+ for(const t of [start-hour,start+25*hour]){now=t;assert.equal((await stats(payload)).ok,true);}
+ for(const t of [start-hour-1,start+25*hour+1]){now=t;assert.equal((await stats(payload)).ok,false);}
+ // Actual local-midnight DST dates, independent of the machine running the suite.
+ const oldTZ=process.env.TZ;
+ try {
+  process.env.TZ='America/Los_Angeles';
+  for(const [month,day,hours] of [[2,8,23],[10,1,25]]){
+   const dayStart=new Date(2026,month,day).getTime(),dayEnd=new Date(2026,month,day+1).getTime();
+   assert.equal(dayEnd-dayStart,hours*hour);now=dayStart+12*hour;
+   assert.equal((await stats({action:'getStats',dayStart,dayEnd})).ok,true);
+  }
+ } finally {if(oldTZ===undefined)delete process.env.TZ;else process.env.TZ=oldTZ;}
+ reset();now=start+12*hour;
+ for(let i=0;i<125;i++){
+  rows.users.push({_id:`u${i}`,openid:`u${i}`});
+  rows.relations.push({_id:`r${i}`,ownerUserId:'owner',viewerUserId:`u${i}`});
+  rows.posts.push({_id:`p${i}`,authorId:'owner',createdAt:iso(start+i),text:'',images:[]});
+ }
+ for(let i=0;i<110;i++)rows.users.push({_id:`legacy${i}`,openid:'u0'});
+ result=await stats(payload);assert.equal(result.memberCount,126);assert.equal(result.todayPostCount,125);
+ actor='u0';assert.equal((await stats(payload)).todayPostCount,125);
+ // Viewer relationships must also span batches, with the same visibility as feed.
+ for(let i=0;i<125;i++){
+  rows.relations.push({_id:`v${i}`,ownerUserId:`other${i}`,viewerUserId:'u0'});
+  rows.posts.push({_id:`other${i}`,authorId:`other${i}`,createdAt:iso(start+hour)});
+ }
+ assert.equal((await stats(payload)).todayPostCount,250);
+ let page, calls=[], response={ok:true,memberCount:2,todayPostCount:0}, fail=false, release;
+ const wx={cloud:{callFunction:async args=>{calls.push(args);if(fail)throw Error('offline');return release?await new Promise(resolve=>{release=resolve;}):{result:response};}},stopPullDownRefresh(){},showToast(){},showModal:async options=>options.success({confirm:true})};
+ vm.runInNewContext(fs.readFileSync(`${root}/pages/feed/index.js`,'utf8'),{Page:x=>page=x,require:()=>({ensureAuthed:async()=>({})}),wx,Date:Clock,console});
+ page.setData=patch=>Object.assign(page.data,patch);
+ release=true;const pending=page.loadStats();assert.equal(page.data.todayPostCount,'–');
+ release({result:response});release=null;await pending;assert.equal(page.data.todayPostCount,0);
+ const local=new Clock();assert.equal(calls.at(-1).data.dayStart,new Date(local.getFullYear(),local.getMonth(),local.getDate()).getTime());
+ assert.equal(calls.at(-1).data.dayEnd,new Date(local.getFullYear(),local.getMonth(),local.getDate()+1).getTime());
+ const previousTZ=process.env.TZ;
+ try {
+  process.env.TZ='America/Los_Angeles';
+  for(const [month,day,hours] of [[2,8,23],[10,1,25]]){
+   now=new Date(2026,month,day,12).getTime();await page.loadStats();
+   const sent=calls.at(-1).data;assert.equal(sent.dayStart,new Date(2026,month,day).getTime());
+   assert.equal(sent.dayEnd-sent.dayStart,hours*hour);
+   assert.equal((await stats(sent)).ok,true);
+  }
+ } finally {if(previousTZ===undefined)delete process.env.TZ;else process.env.TZ=previousTZ;}
+ response={ok:false,msg:'rejected'};await page.loadStats();assert.equal(page.data.memberCount,'--');assert.equal(page.data.todayPostCount,'--');
+ fail=true;await page.loadStats();assert.equal(page.data.todayPostCount,'--');fail=false;
+ response={ok:true,memberCount:2,todayPostCount:4};await page.loadStats();assert.equal(page.data.todayPostCount,4);
+ release=true;const stale=page.loadStats();const finishStale=release;release=null;await page.loadStats();finishStale({result:{ok:true,memberCount:9,todayPostCount:99}});await stale;assert.equal(page.data.todayPostCount,4);
+ let refreshes=0,lists=0;page.loadStats=async()=>{refreshes++;};page.loadPosts=async()=>{lists++;};page.refreshSessionFlags=async()=>({});
+ await page.onShow();await page.onPullDownRefresh();await page.onDeletePost({currentTarget:{dataset:{id:'p'}}});
+ assert.equal(refreshes,3);assert.equal(lists,3);
+ response={ok:false,msg:'delete rejected'};await page.onDeletePost({currentTarget:{dataset:{id:'p'}}});
+ assert.equal(refreshes,3);assert.equal(lists,3);
+ console.log('PASS: stats membership/deduplication, 100+ batching, feed visibility/cutoff, local midnight/DST, validation/grace boundaries, start-inclusive/end-exclusive, loading/failure/races and refresh lifecycle');
+}
+
 async function run(){
  reset();delete env.OWNER_OPENID;assert.equal((await admin({action:'createInviteCode'})).ok,false);assert.equal((await auth({action:'bootstrapOwner'})).ok,false);
  env.OWNER_OPENID='owner';actor='stranger';assert.equal((await auth({action:'bootstrapOwner'})).ok,false);assert.equal((await post({action:'createPost',text:'x',images:[]})).ok,false);
@@ -224,6 +312,7 @@ async function run(){
  await previewTests();
  await nicknameTests();
  await nicknameSheetTests();
+ await statsTests();
  console.log('PASS: owner fail-closed, input validation, atomic invite redemption, idempotent user creation, deterministic concurrent likes, cutoff query, tied timestamp pagination (45 posts), enrichment/detail (125 records), media permission/batching, cascading deletion');
 }
 run().catch(e=>{console.error(e);process.exitCode=1;});

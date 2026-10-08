@@ -9,8 +9,9 @@ Page({
     isAdmin: false,
     loading: false,
     hasMore: true,
-    nextCursor: null
-    
+    nextCursor: null,
+    memberCount: "–",
+    todayPostCount: "–"
   },
   previewImage(e) {
     const { urls, current } = e.currentTarget.dataset;
@@ -22,7 +23,7 @@ Page({
       const user = await ensureAuthed();
       this.setData({ currentUser: user });
       const session = await this.refreshSessionFlags();
-      await this.loadPosts(session);
+      await Promise.all([this.loadPosts(session), this.loadStats()]);
     } catch (error) {
       console.error(error);
     }
@@ -47,7 +48,31 @@ Page({
   },
 
   async onPullDownRefresh() {
-    try { await this.loadPosts(); } finally { wx.stopPullDownRefresh(); }
+    try { await Promise.all([this.loadPosts(), this.loadStats()]); } finally { wx.stopPullDownRefresh(); }
+  },
+
+  async loadStats() {
+    const request = (this.statsRequest || 0) + 1;
+    this.statsRequest = request;
+    this.setData({ memberCount: "–", todayPostCount: "–" });
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+    const dayStart = new Date(y, m, d).getTime();
+    const dayEnd = new Date(y, m, d + 1).getTime();
+    try {
+      const { result } = await wx.cloud.callFunction({
+        name: "auth", data: { action: "getStats", dayStart, dayEnd }
+      });
+      if (!result?.ok || !Number.isInteger(result.memberCount) || result.memberCount < 1 ||
+          !Number.isInteger(result.todayPostCount) || result.todayPostCount < 0) {
+        throw new Error(result?.msg || "统计加载失败");
+      }
+      if (this.statsRequest === request) this.setData({
+        memberCount: result.memberCount, todayPostCount: result.todayPostCount
+      });
+    } catch (error) {
+      if (this.statsRequest === request) this.setData({ memberCount: "--", todayPostCount: "--" });
+    }
   },
 
   onReachBottom() {
@@ -136,7 +161,7 @@ Page({
             throw new Error(result?.msg || "删除失败");
           }
           wx.showToast({ title: "已删除" });
-          this.loadPosts();
+          await Promise.all([this.loadPosts(), this.loadStats()]);
         } catch (err) {
           wx.showToast({
             title: err.message || "删除失败",

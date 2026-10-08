@@ -8,6 +8,20 @@
     </view>
     <blob-avatar identity="{{openid || currentUser.nickname}}" size="112" />
   </view>
+  <view class="stats-row">
+    <view class="stats-card stats-members">
+      <view class="stats-label">圈友</view>
+      <view class="stats-value"><text>{{memberCount}}</text><text class="stats-unit">人</text></view>
+      <view class="stats-dots" aria-hidden="true">
+        <view class="stats-dot dot-orange" /><view class="stats-dot dot-yellow" /><view class="stats-dot dot-pink" />
+      </view>
+    </view>
+    <view class="stats-card stats-today">
+      <view class="stats-label">今日动态</view>
+      <view class="stats-value"><text>{{todayPostCount}}</text><text class="stats-unit">条</text></view>
+      <view class="stats-caption">今天</view>
+    </view>
+  </view>
   <block wx:if="{{posts.length}}">
     <view class="card post" wx:for="{{posts}}" wx:key="_id">
       <view class="head">

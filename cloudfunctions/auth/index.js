@@ -30,6 +30,65 @@ async function handle(event) {
   const { OPENID } = cloud.getWXContext();
   const action = event.action;
 
+  if (action === "getStats") {
+    const { dayStart, dayEnd } = event;
+    const hour = 60 * 60 * 1000;
+    const now = Date.now();
+    if (!Number.isFinite(dayStart) || !Number.isFinite(dayEnd) ||
+        dayEnd - dayStart < 23 * hour || dayEnd - dayStart > 25 * hour ||
+        now < dayStart - hour || now > dayEnd + hour) {
+      return { ok: false, msg: "统计时间范围无效" };
+    }
+
+    // Mirrors post/index.js:isMember, including owner access without a profile.
+    const owner = process.env.OWNER_OPENID;
+    if (!owner) return { ok: false, msg: "仅圈子成员可查看统计" };
+    if (OPENID !== owner) {
+      const profile = await db.collection("users").where({ openid: OPENID }).limit(1).get();
+      const relation = await db.collection("relations").where({
+        ownerUserId: owner, viewerUserId: OPENID
+      }).limit(1).get();
+      if (!profile.data.length || !relation.data.length) {
+        return { ok: false, msg: "仅圈子成员可查看统计" };
+      }
+    }
+
+    async function readAll(collection, condition) {
+      const records = [];
+      while (true) {
+        const result = await db.collection(collection).where(condition)
+          .orderBy("_id", "asc").skip(records.length).limit(100).get();
+        records.push(...result.data);
+        if (result.data.length < 100) return records;
+      }
+    }
+    const memberRelations = await readAll("relations", { ownerUserId: owner });
+    const candidates = [...new Set(memberRelations.map(r => r.viewerUserId))];
+    const members = new Set([owner]);
+    for (let i = 0; i < candidates.length; i += 20) {
+      const profiles = await readAll("users", { openid: _.in(candidates.slice(i, i + 20)) });
+      profiles.forEach(profile => members.add(profile.openid));
+    }
+
+    // Match listPosts: own posts plus each related author's optional cutoff.
+    const viewerRelations = await readAll("relations", { viewerUserId: OPENID });
+    const cutoffs = viewerRelations.reduce((map, relation) => {
+      map[relation.ownerUserId] = relation.canViewUntil || null;
+      return map;
+    }, {});
+    const visibility = [{ authorId: OPENID }];
+    for (const [authorId, cutoff] of Object.entries(cutoffs)) {
+      if (authorId !== OPENID) visibility.push(cutoff
+        ? { authorId, createdAt: _.lte(cutoff) } : { authorId });
+    }
+    const start = new Date(dayStart).toISOString();
+    const end = new Date(dayEnd).toISOString();
+    const posts = await readAll("posts", _.and([
+      _.or(visibility), { createdAt: _.gte(start) }, { createdAt: _.lt(end) }
+    ]));
+    return { ok: true, memberCount: members.size, todayPostCount: posts.length };
+  }
+
   if (action === "getSession") {
     const users = await db.collection("users").where({ openid: OPENID }).limit(1).get();
     const isAdmin = !!process.env.OWNER_OPENID && OPENID === process.env.OWNER_OPENID;
