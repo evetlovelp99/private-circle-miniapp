@@ -23,7 +23,7 @@ Page({
         data: { action: "listMembers" }
       });
       if (!result?.ok) {
-        wx.showToast({ title: result?.message === "only admin allowed" ? "仅创建者可管理成员" : "加载失败", icon: "none" });
+        wx.showToast({ title: result?.msg === "only admin allowed" ? "仅创建者可管理成员" : "加载失败", icon: "none" });
         this.setData({ loading: false });
         setTimeout(() => wx.navigateBack(), 1500);
         return;
@@ -48,7 +48,7 @@ Page({
             name: "admin",
             data: { action: "silentCutoff", viewerOpenid }
           });
-          if (!result?.ok) throw new Error(result?.message || "操作失败");
+          if (!result?.ok) throw new Error(result?.msg || "操作失败");
           wx.showToast({ title: "已设置" });
           this.loadMembers();
         } catch (err) {

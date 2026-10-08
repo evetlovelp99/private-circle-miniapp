@@ -18,7 +18,7 @@ async function ensureUser(openid) {
   return { ...user, _id: added._id };
 }
 
-exports.main = async (event) => {
+async function handle(event) {
   const { OPENID } = cloud.getWXContext();
   const action = event.action;
 
@@ -36,23 +36,24 @@ exports.main = async (event) => {
 
   if (action === "bootstrapOwner") {
     if (!process.env.OWNER_OPENID || OPENID !== process.env.OWNER_OPENID) {
-      return { ok: false, message: "仅指定创建者可创建圈子" };
+      return { ok: false, msg: "仅指定创建者可创建圈子" };
     }
     const user = await ensureUser(OPENID);
     return { ok: true, openid: OPENID, user };
   }
 
   if (action === "verifyInvite") {
-    const code = (event.code || "").trim().toUpperCase();
+    if (typeof event.code !== "string") return { ok: false, msg: "邀请码必须为字符串" };
+    const code = event.code.trim().toUpperCase();
     if (!code) {
-      return { ok: false, message: "邀请码不能为空" };
+      return { ok: false, msg: "邀请码不能为空" };
     }
     const inviteRes = await db.collection("inviteCodes").where({
       code,
       isUsed: false
     }).limit(1).get();
     if (!inviteRes.data.length) {
-      return { ok: false, message: "邀请码无效或已使用" };
+      return { ok: false, msg: "邀请码无效或已使用" };
     }
 
     const invite = inviteRes.data[0];
@@ -82,5 +83,14 @@ exports.main = async (event) => {
     return { ok: true, openid: OPENID, user };
   }
 
-  return { ok: false, message: "unknown action" };
+  return { ok: false, msg: "unknown action" };
+}
+
+exports.main = async (event) => {
+  try {
+    return await handle(event || {});
+  } catch (error) {
+    console.error("cloud function failed", error);
+    return { ok: false, msg: "操作失败，请稍后重试" };
+  }
 };

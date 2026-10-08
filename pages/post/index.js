@@ -42,7 +42,7 @@ Page({
       const result = detailRes.result;
       if (!result?.ok || !result.post) {
         wx.showToast({
-          title: result?.message === "no permission" ? "暂无权限查看" : "加载失败",
+          title: result?.msg === "no permission" ? "暂无权限查看" : "加载失败",
           icon: "none"
         });
         this.setData({
@@ -130,7 +130,7 @@ Page({
             name: "post",
             data: { action: "deletePost", postId: this.data.postId }
           });
-          if (!result?.ok) throw new Error(result?.message || "删除失败");
+          if (!result?.ok) throw new Error(result?.msg || "删除失败");
           wx.showToast({ title: "已删除" });
           setTimeout(() => wx.navigateBack(), 300);
         } catch (e) {

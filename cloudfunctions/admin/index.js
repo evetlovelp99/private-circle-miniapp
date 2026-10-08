@@ -12,13 +12,13 @@ async function ensureAdmin(openid) {
   return !!process.env.OWNER_OPENID && openid === process.env.OWNER_OPENID;
 }
 
-exports.main = async (event) => {
+async function handle(event) {
   const { OPENID } = cloud.getWXContext();
   const action = event.action;
 
   const isAdmin = await ensureAdmin(OPENID);
   if (!isAdmin) {
-    return { ok: false, message: "only admin allowed" };
+    return { ok: false, msg: "only admin allowed" };
   }
 
   if (action === "createInviteCode") {
@@ -73,7 +73,7 @@ exports.main = async (event) => {
       viewerUserId: viewerOpenid
     }).limit(1).get();
     if (!relRes.data.length) {
-      return { ok: false, message: "relation not found" };
+      return { ok: false, msg: "relation not found" };
     }
     await db.collection("relations").doc(relRes.data[0]._id).update({
       data: {
@@ -83,5 +83,14 @@ exports.main = async (event) => {
     return { ok: true };
   }
 
-  return { ok: false, message: "unknown action" };
+  return { ok: false, msg: "unknown action" };
+}
+
+exports.main = async (event) => {
+  try {
+    return await handle(event || {});
+  } catch (error) {
+    console.error("cloud function failed", error);
+    return { ok: false, msg: "操作失败，请稍后重试" };
+  }
 };

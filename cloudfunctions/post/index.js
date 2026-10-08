@@ -38,11 +38,44 @@ async function canViewPost(post, viewerOpenid) {
   return post.createdAt <= relation.canViewUntil;
 }
 
-exports.main = async (event) => {
+function isOwner(openid) {
+  return !!process.env.OWNER_OPENID && openid === process.env.OWNER_OPENID;
+}
+
+async function isMember(openid) {
+  if (isOwner(openid)) return true;
+  if (!process.env.OWNER_OPENID) return false;
+  const users = await db.collection("users").where({ openid }).limit(1).get();
+  const relations = await db.collection("relations").where({
+    ownerUserId: process.env.OWNER_OPENID, viewerUserId: openid
+  }).limit(1).get();
+  return !!users.data.length && !!relations.data.length;
+}
+
+function isFileID(value) {
+  return typeof value === "string" && /^cloud:\/\/[^/\s]+\/[^\s]+$/.test(value);
+}
+
+function validatePost(event) {
+  if (typeof event.text !== "string" || event.text.length > 1000) return "文字必须为不超过1000字的字符串";
+  if (!Array.isArray(event.images) || event.images.length > 9 || !event.images.every(isFileID)) return "图片必须为最多9个云文件ID";
+  for (const key of ["audioFileId", "videoFileId", "videoThumbFileId", "liveMotionFileId"]) {
+    if (event[key] !== undefined && event[key] !== "" && !isFileID(event[key])) return "媒体文件ID无效";
+  }
+  if (event.liveMotionFileId && !event.images.length) return "实况缺少封面";
+  if (event.videoThumbFileId && !event.videoFileId) return "视频封面缺少视频";
+  if (!event.text.trim() && !event.images.length && !event.audioFileId && !event.videoFileId && !event.liveMotionFileId) return "动态不能为空";
+  return "";
+}
+
+async function handle(event) {
   const { OPENID } = cloud.getWXContext();
   const action = event.action;
 
   if (action === "createPost") {
+    if (!(await isMember(OPENID))) return { ok: false, msg: "仅圈子成员可发布" };
+    const invalid = validatePost(event);
+    if (invalid) return { ok: false, msg: invalid };
     const post = {
       authorId: OPENID,
       text: event.text || "",
@@ -101,12 +134,12 @@ exports.main = async (event) => {
     const docRes = await db.collection("posts").doc(postId).get();
     const post = docRes.data;
     if (!post) {
-      return { ok: false, message: "not found" };
+      return { ok: false, msg: "not found" };
     }
     const isAuthor = post.authorId === OPENID;
     const isAdmin = !!process.env.OWNER_OPENID && OPENID === process.env.OWNER_OPENID;
     if (!isAuthor && !isAdmin) {
-      return { ok: false, message: "no permission" };
+      return { ok: false, msg: "no permission" };
     }
 
     const likeBatch = await db.collection("likes").where({ postId }).get();
@@ -125,7 +158,7 @@ exports.main = async (event) => {
     const postId = event.postId;
     const postRes = await db.collection("posts").doc(postId).get();
     if (!(await canViewPost(postRes.data, OPENID))) {
-      return { ok: false, message: "no permission" };
+      return { ok: false, msg: "no permission" };
     }
     const exist = await db.collection("likes").where({
       postId,
@@ -150,7 +183,7 @@ exports.main = async (event) => {
     const postRes = await db.collection("posts").doc(postId).get();
     const post = postRes.data;
     if (!(await canViewPost(post, OPENID))) {
-      return { ok: false, message: "no permission" };
+      return { ok: false, msg: "no permission" };
     }
     const userRes = await db.collection("users").where({ openid: post.authorId }).limit(1).get();
     const commentsRes = await db.collection("comments").where({ postId }).orderBy("createdAt", "asc").get();
@@ -171,20 +204,33 @@ exports.main = async (event) => {
   }
 
   if (action === "addComment") {
+    if (!(await isMember(OPENID))) return { ok: false, msg: "仅圈子成员可评论" };
+    if (typeof event.content !== "string" || !event.content.trim() || event.content.trim().length > 500) {
+      return { ok: false, msg: "评论须为1至500字" };
+    }
     const postRes = await db.collection("posts").doc(event.postId).get();
     if (!(await canViewPost(postRes.data, OPENID))) {
-      return { ok: false, message: "no permission" };
+      return { ok: false, msg: "no permission" };
     }
     await db.collection("comments").add({
       data: {
         postId: event.postId,
         userId: OPENID,
-        content: event.content || "",
+        content: event.content.trim(),
         createdAt: new Date().toISOString()
       }
     });
     return { ok: true };
   }
 
-  return { ok: false, message: "unknown action" };
+  return { ok: false, msg: "unknown action" };
+}
+
+exports.main = async (event) => {
+  try {
+    return await handle(event || {});
+  } catch (error) {
+    console.error("cloud function failed", error);
+    return { ok: false, msg: "操作失败，请稍后重试" };
+  }
 };

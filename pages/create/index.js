@@ -343,7 +343,7 @@ Page({
         }
       });
       if (!result?.ok) {
-        throw new Error(result?.message || "失败");
+        throw new Error(result?.msg || "失败");
       }
       wx.showToast({ title: "发布成功" });
       this.resetDraft();

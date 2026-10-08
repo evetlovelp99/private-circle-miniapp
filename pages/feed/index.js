@@ -120,7 +120,7 @@ Page({
             data: { action: "deletePost", postId }
           });
           if (!result?.ok) {
-            throw new Error(result?.message || "删除失败");
+            throw new Error(result?.msg || "删除失败");
           }
           wx.showToast({ title: "已删除" });
           this.loadPosts();

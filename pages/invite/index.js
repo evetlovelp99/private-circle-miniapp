@@ -38,7 +38,7 @@ Page({
         }
       });
       if (!result || !result.ok) {
-        throw new Error(result?.message || "邀请码无效");
+        throw new Error(result?.msg || "邀请码无效");
       }
       const app = getApp();
       app.globalData.user = result.user;
@@ -59,7 +59,7 @@ Page({
         data: { action: "bootstrapOwner" }
       });
       if (!result || !result.ok) {
-        throw new Error(result?.message || "创建失败");
+        throw new Error(result?.msg || "创建失败");
       }
       const app = getApp();
       app.globalData.user = result.user;
