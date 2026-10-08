@@ -9,6 +9,11 @@ Page({
     loading: false,
     hasMore: true,
     nextCursor: null
+    
+  },
+  previewImage(e) {
+    const { urls, current } = e.currentTarget.dataset;
+    wx.previewImage({ current, urls });
   },
 
   async onShow() {

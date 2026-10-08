@@ -37,9 +37,13 @@
         <image
           class="img"
           wx:for="{{item.images}}"
+          wx:for-item="img"
           wx:key="*this"
           mode="aspectFill"
-          src="{{item}}"
+          src="{{img}}"
+          data-urls="{{item.images}}"
+          data-current="{{img}}"
+          catchtap="previewImage"
         />
       </view>
 
