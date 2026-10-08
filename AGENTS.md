@@ -22,8 +22,21 @@
   `listPosts` / `getPostDetail` resolve names at read time via `getUsersMap`.
 - `blob-avatar` hashes the `identity` prop. Pages pass openid first, nickname only as fallback. Keep it that way.
 - The only user cache is `app.globalData.user`. There is no wx storage cache for the user.
-- The membership check in `cloudfunctions/auth` mirrors `cloudfunctions/post/index.js` → `isMember`. If you change one, change the other.
+- Membership rule source of truth is `isMember` in `cloudfunctions/post/index.js`: the owner (`OWNER_OPENID`) passes directly; an ordinary member needs both a `users.openid` profile and an owner→member record in `relations`; if `OWNER_OPENID` is not configured, reject everyone.
+  Membership does NOT check `canViewUntil`; that field only limits post visibility.
+- The membership checks in `cloudfunctions/auth` (`updateNickname`, `getStats`) are copies of `isMember`. Changing any one of them requires changing all of them.
 - Cloud functions must take the caller's openid from `cloud.getWXContext().OPENID`, never from frontend input.
+- `stats.updated` / `stats.removed` in the code are database write results, unrelated to the stats feature.
+- The test double in `tests/security.cjs` supports `gte` queries and a controllable clock.
+
+## Stats cards (auth.getStats)
+- Returns `{ ok: true, memberCount, todayPostCount }` or `{ ok: false, msg }`.
+- `memberCount` includes the owner, dedupes by openid, and paginates past one query batch.
+- "Today" follows the caller's phone local time: the client computes local midnight today and tomorrow with `new Date(y, m, d)` and sends `dayStart` / `dayEnd` (ms).
+  The server checks both are finite, the span is 23–25 hours, and server time is within `[dayStart − 1h, dayEnd + 1h]`; then counts posts with `dayStart <= createdAt < dayEnd` that the caller can see (respecting `canViewUntil`).
+  Never use a fixed server time zone.
+- Feed refreshes stats on `onShow`, pull-down refresh, and after a successful delete.
+  Loading shows "–", failure shows "--", never 0.
 
 ## Design system (already in app.wxss — reuse its variables)
 - Style: hand-drawn illustration feel. Flat, thick black outlines. **No shadows, no gradients.**
