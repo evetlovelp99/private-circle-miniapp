@@ -8,8 +8,9 @@ async function getAll(collection, condition, orderField = "_id", direction = "as
   const rows = [];
   let offset = 0;
   while (true) {
-    const result = await db.collection(collection).where(condition).orderBy(orderField, direction)
-      .orderBy("_id", "asc").skip(offset).limit(100).get();
+    let query = db.collection(collection).where(condition).orderBy(orderField, direction);
+    if (orderField !== "_id") query = query.orderBy("_id", "asc");
+    const result = await query.skip(offset).limit(100).get();
     rows.push(...result.data);
     if (result.data.length < 100) return rows;
     offset += result.data.length;
@@ -184,13 +185,21 @@ async function handle(event) {
       return { ok: false, msg: "no permission" };
     }
 
-    const likeBatch = await db.collection("likes").where({ postId }).get();
-    for (const l of likeBatch.data) {
-      await db.collection("likes").doc(l._id).remove();
+    const fileIDs = collectFileIDs(post);
+    for (let i = 0; i < fileIDs.length; i += 50) {
+      const batch = fileIDs.slice(i, i + 50);
+      const deleted = await cloud.deleteFile({ fileList: batch });
+      if (!deleted.fileList || batch.some((id) =>
+        !deleted.fileList.some((file) => file.fileID === id && file.status === 0))) {
+        return { ok: false, msg: "部分媒体删除失败，请重试" };
+      }
     }
-    const commentBatch = await db.collection("comments").where({ postId }).get();
-    for (const c of commentBatch.data) {
-      await db.collection("comments").doc(c._id).remove();
+    for (const collection of ["likes", "comments"]) {
+      while (true) {
+        const batch = await db.collection(collection).where({ postId }).limit(100).get();
+        if (!batch.data.length) break;
+        for (const record of batch.data) await db.collection(collection).doc(record._id).remove();
+      }
     }
     await db.collection("posts").doc(postId).remove();
     return { ok: true };

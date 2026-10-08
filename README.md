@@ -3,7 +3,7 @@
 ## 已实现能力
 
 **第一版（MVP）**
-- 邀请码进入（一次性）/ 首次「创建圈子」无障碍进入
+- 邀请码进入（一次性）/ 仅指定 OWNER_OPENID 可「创建圈子」
 - 图文动态发布
 - 首页私密动态流
 - 点赞、评论
@@ -40,15 +40,30 @@
 帖子字段（云存储 fileID，可为空字符串）：  
 `audio` 语音；`images` 图片数组；`video` / `videoThumb` 普通视频与封面；`liveMotion` 实况动态视频（实况封面放在 `images[0]`）。
 
-## 3. 推荐索引
+## 3. 权限、环境变量与索引（上线前手动配置）
 
-- `relations.ownerUserId`（列表成员：`where ownerUserId = 管理员`）
-- `relations.ownerUserId + viewerUserId`
-- `posts.authorId + createdAt`
+- 在 `auth`、`admin`、`post` 三个云函数中设置同一个 `OWNER_OPENID`，值为创建者的微信 OpenID。未设置时拒绝所有管理操作、创建圈子及非创建者发布/评论；不会从用户注册顺序推断管理员。
+- 六个集合 `users`、`inviteCodes`、`relations`、`posts`、`likes`、`comments` 全部设为「仅管理端可读写」。客户端仅通过云函数访问数据库。
+- 存储设为私有读取。当前客户端仍使用 `wx.cloud.uploadFile`：必须保留已认证用户上传自己文件的权限，禁止读取他人文件；若设置为客户端完全禁止写入，发布上传会失败。请在控制台核实私有存储规则的实际读写行为，并用真机验证。媒体临时链接由云函数通过权限检查后返回，链接有效期内持有者可访问，请勿转发。
+- 建议索引（字段使用实际代码中的 `ownerUserId` / `viewerUserId`）：
+  - `posts.createdAt desc + _id desc`（游标排序；相同时间用 `_id` 分页）
+  - `posts.authorId asc + createdAt desc + _id desc`（按作者与截止时间过滤）
+  - `inviteCodes.code asc`，建议唯一；新邀请码也用 code 作为 `_id`
+  - `relations.ownerUserId asc + viewerUserId asc`，建议唯一
+  - `relations.viewerUserId asc + _id asc`
+  - `users.openid asc + _id asc`
+  - `likes.postId asc + _id asc`
+  - `comments.postId asc + _id asc`
+  - `comments.postId asc + createdAt asc + _id asc`
+- 控制台可能已有系统 `_id` 索引；复合查询所需索引以实际云数据库提示为准，包含 OR 可见性查询。创建唯一索引前先核查并去重历史数据。
+
+新邀请码为12位安全随机码，7天后过期；旧记录缺少 `used` / `expiresAt` 的邀请码不再接受，请重新生成。消费成功后才创建用户和关系，用户 `_id` 使用 OpenID；历史用户会在 ensureUser 时复制为规范ID，旧文档不会自动删除。上线前备份并清理旧用户重复记录、关系重复记录，以及旧的随机ID点赞记录（同一 postId/userId 合并并改为 `postId_openid`），避免历史重复计数。
+
+邀请码消费与后续用户/关系写入不是跨集合事务：后续写入失败时邀请码仍已消费，需要创建者核实记录并重新发码。删除媒体和数据库记录也不是跨服务事务，部分失败会返回失败，需核实后重试；并发评论/点赞与删帖交错仍需真机验证。所有改动只修改源码，本文不表示控制台权限、索引或云函数已部署。
 
 ## 4. 使用流程简述
 
-1. 首次无任何用户：`邀请码页` → **我是创建者，创建圈子**
+1. 配置的创建者：`邀请码页` → **我是创建者，创建圈子**
 2. 创建者：`我的 → 管理` 生成一次性邀请码
 3. `管理` 顶部 **成员管理**：查看已通过邀请进来的成员，或对某人 **停止对方看新动态**
 4. 他人：输入邀请码进入，可见关系按产品设计过滤
@@ -63,6 +78,9 @@
 
 ## 6. 后续可做（第三版方向）
 
-- 视频动态
 - 评论回复 / @
 - 消息提醒、UI 优化
+
+## 7. 本地验证
+
+运行 `node tests/security.cjs`，使用内存模拟数据库验证权限、参数校验、并发邀请码、固定ID点赞、同时间戳分页、超过100条的统计/详情/删除和客户端失败处理。它不连接云环境，不能代替微信真机与真实数据库验证。
