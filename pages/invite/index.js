@@ -11,6 +11,13 @@ Page({
         name: "auth",
         data: { action: "getSession" }
       });
+      if (result?.ok && result.user) {
+        const app = getApp();
+        app.globalData.user = result.user;
+        app.globalData.openid = result.openid;
+        wx.switchTab({ url: "/pages/feed/index" });
+        return;
+      }
       this.setData({
         canBootstrap: !!result?.canBootstrap
       });
