@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "私密动态"
+  "navigationBarTitleText": "私密动态",
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 80
 }

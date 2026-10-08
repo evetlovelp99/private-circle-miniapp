@@ -5,7 +5,10 @@ Page({
   data: {
     posts: [],
     openid: "",
-    isAdmin: false
+    isAdmin: false,
+    loading: false,
+    hasMore: true,
+    nextCursor: null
   },
 
   async onShow() {
@@ -36,13 +39,24 @@ Page({
     }
   },
 
-  async loadPosts(session) {
+  async onPullDownRefresh() {
+    try { await this.loadPosts(); } finally { wx.stopPullDownRefresh(); }
+  },
+
+  onReachBottom() {
+    if (this.data.hasMore && !this.data.loading) this.loadPosts(null, true);
+  },
+
+  async loadPosts(session, append = false) {
+    if (this.data.loading) return;
+    this.setData({ loading: true });
     wx.showLoading({ title: "加载中" });
     try {
       const { result } = await wx.cloud.callFunction({
         name: "post",
-        data: { action: "listPosts" }
+        data: { action: "listPosts", ...(append ? this.data.nextCursor || {} : {}) }
       });
+      if (!result?.ok) throw new Error(result?.msg || "加载失败");
       const raw = result?.data || [];
       const urlMap = result?.mediaUrls || {};
       const openid = session?.openid ?? this.data.openid;
@@ -73,10 +87,17 @@ Page({
           _canDelete: !!(item.authorId === openid || isAdmin)
         };
       });
-      this.setData({ posts });
+      const combined = append ? this.data.posts.concat(posts) : posts;
+      const seen = new Set();
+      this.setData({ posts: combined.filter((post) => {
+        if (seen.has(post._id)) return false;
+        seen.add(post._id);
+        return true;
+      }), hasMore: !!result.hasMore, nextCursor: result.nextCursor || null });
     } catch (error) {
-      wx.showToast({ title: "加载失败", icon: "none" });
+      wx.showToast({ title: error.message || "加载失败", icon: "none" });
     } finally {
+      this.setData({ loading: false });
       wx.hideLoading();
     }
   },

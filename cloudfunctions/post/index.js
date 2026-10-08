@@ -4,11 +4,21 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
+async function getAll(collection, condition, orderField = "_id", direction = "asc") {
+  const rows = [];
+  let offset = 0;
+  while (true) {
+    const result = await db.collection(collection).where(condition).orderBy(orderField, direction)
+      .orderBy("_id", "asc").skip(offset).limit(100).get();
+    rows.push(...result.data);
+    if (result.data.length < 100) return rows;
+    offset += result.data.length;
+  }
+}
+
 async function getRelationsMap(viewerOpenid) {
-  const relRes = await db.collection("relations").where({
-    viewerUserId: viewerOpenid
-  }).get();
-  return relRes.data.reduce((acc, r) => {
+  const relations = await getAll("relations", { viewerUserId: viewerOpenid });
+  return relations.reduce((acc, r) => {
     acc[r.ownerUserId] = r.canViewUntil || null;
     return acc;
   }, {});
@@ -16,10 +26,12 @@ async function getRelationsMap(viewerOpenid) {
 
 async function getUsersMap(openids) {
   if (!openids.length) return {};
-  const userRes = await db.collection("users").where({
-    openid: _.in(openids)
-  }).get();
-  return userRes.data.reduce((acc, u) => {
+  const users = [];
+  const unique = [...new Set(openids)];
+  for (let i = 0; i < unique.length; i += 20) {
+    users.push(...await getAll("users", { openid: _.in(unique.slice(i, i + 20)) }));
+  }
+  return users.reduce((acc, u) => {
     acc[u.openid] = u;
     return acc;
   }, {});
@@ -112,27 +124,35 @@ async function handle(event) {
 
   if (action === "listPosts") {
     const relationsMap = await getRelationsMap(OPENID);
-    const authorOpenids = [...new Set(Object.keys(relationsMap).concat([OPENID]))];
-    const postRes = await db.collection("posts").where({
-      authorId: _.in(authorOpenids)
-    }).orderBy("createdAt", "desc").limit(50).get();
-    const posts = postRes.data.filter((post) => {
-      if (post.authorId === OPENID) return true;
-      const canViewUntil = relationsMap[post.authorId];
-      if (canViewUntil === undefined) return false;
-      if (!canViewUntil) return true;
-      return post.createdAt <= canViewUntil;
-    });
+    if (event.before !== undefined && (typeof event.before !== "string" || !Number.isFinite(Date.parse(event.before)))) {
+      return { ok: false, msg: "分页时间无效" };
+    }
+    if (event.beforeId !== undefined && typeof event.beforeId !== "string") return { ok: false, msg: "分页ID无效" };
+    const visibility = [{ authorId: OPENID }];
+    for (const [authorId, cutoff] of Object.entries(relationsMap)) {
+      if (authorId === OPENID) continue;
+      visibility.push(cutoff ? { authorId, createdAt: _.lte(cutoff) } : { authorId });
+    }
+    let condition = _.or(visibility);
+    if (event.before) {
+      const cursor = event.beforeId ? _.or([
+        { createdAt: _.lt(event.before) },
+        { createdAt: event.before, _id: _.lt(event.beforeId) }
+      ]) : { createdAt: _.lt(event.before) };
+      condition = _.and([condition, cursor]);
+    }
+    const postRes = await db.collection("posts").where(condition)
+      .orderBy("createdAt", "desc").orderBy("_id", "desc").limit(21).get();
+    const hasMore = postRes.data.length > 20;
+    const posts = postRes.data.slice(0, 20);
     const postIds = posts.map((p) => p._id);
-    const usersMap = await getUsersMap(authorOpenids);
+    const usersMap = await getUsersMap(posts.map((post) => post.authorId));
 
     let likes = [];
     let comments = [];
     if (postIds.length) {
-      const likeRes = await db.collection("likes").where({ postId: _.in(postIds) }).get();
-      const commentRes = await db.collection("comments").where({ postId: _.in(postIds) }).get();
-      likes = likeRes.data;
-      comments = commentRes.data;
+      likes = await getAll("likes", { postId: _.in(postIds) });
+      comments = await getAll("comments", { postId: _.in(postIds) });
     }
 
     const data = posts.map((post) => {
@@ -146,7 +166,9 @@ async function handle(event) {
         liked: postLikes.some((l) => l.userId === OPENID)
       };
     });
-    return { ok: true, data, mediaUrls: await resolveMedia(posts) };
+    const last = posts[posts.length - 1];
+    return { ok: true, data, mediaUrls: await resolveMedia(posts), hasMore,
+      nextCursor: last ? { before: last.createdAt, beforeId: last._id } : null };
   }
 
   if (action === "deletePost") {
@@ -212,7 +234,7 @@ async function handle(event) {
       return { ok: false, msg: "no permission" };
     }
     const userRes = await db.collection("users").where({ openid: post.authorId }).limit(1).get();
-    const commentsRes = await db.collection("comments").where({ postId }).orderBy("createdAt", "asc").get();
+    const commentsRes = { data: await getAll("comments", { postId }, "createdAt") };
     const commenters = [...new Set(commentsRes.data.map((c) => c.userId))];
     const usersMap = await getUsersMap(commenters);
     const comments = commentsRes.data.map((c) => ({
