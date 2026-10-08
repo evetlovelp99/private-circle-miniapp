@@ -34,6 +34,9 @@ Page({
       wx.showToast({ title: error.message || "创建失败", icon: "none" });
     }
   },
+  copyCode() {
+    wx.setClipboardData({ data: this.data.newCode })
+  },
 
   async silentCutoff() {
     if (!this.data.viewerOpenid) {

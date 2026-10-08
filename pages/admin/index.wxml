@@ -6,7 +6,10 @@
   <view class="card">
     <view class="title">生成邀请码</view>
     <button class="btn-primary" bindtap="createInviteCode">生成一次性邀请码</button>
-    <view class="code" wx:if="{{newCode}}">最新邀请码：{{newCode}}</view>
+    <view class="code" wx:if="{{newCode}}">
+      最新邀请码：{{newCode}}
+      <button size="mini" bindtap="copyCode">复制</button>
+    </view>
   </view>
 
   <view class="card">
