@@ -180,21 +180,27 @@ async function handle(event) {
     if (!(await canViewPost(postRes.data, OPENID))) {
       return { ok: false, msg: "no permission" };
     }
-    const exist = await db.collection("likes").where({
-      postId,
-      userId: OPENID
-    }).limit(1).get();
-    if (exist.data.length) {
-      await db.collection("likes").doc(exist.data[0]._id).remove();
+    const likeId = `${postId}_${OPENID}`;
+    const likes = db.collection("likes");
+    let existing;
+    try {
+      existing = (await likes.doc(likeId).get()).data;
+    } catch (error) {
+      // A missing document may reject; add below remains protected by its fixed _id.
+      existing = null;
+    }
+    if (existing) {
+      await likes.doc(likeId).remove();
       return { ok: true, liked: false };
     }
-    await db.collection("likes").add({
-      data: {
-        postId,
-        userId: OPENID,
-        createdAt: new Date().toISOString()
-      }
-    });
+    try {
+      await likes.add({ data: {
+        _id: likeId, postId, userId: OPENID, createdAt: new Date().toISOString()
+      } });
+    } catch (error) {
+      const raced = await likes.doc(likeId).get();
+      if (!raced.data) throw error;
+    }
     return { ok: true, liked: true };
   }
 
